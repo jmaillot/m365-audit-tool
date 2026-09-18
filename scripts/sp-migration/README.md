@@ -1,6 +1,6 @@
 # SharePoint migration toolkit (couche admin — hors SaaS)
 
-Compagnon du collecteur SaaS (onglet produit **SharePoint**) pour préparer une
+Compagnon du collecteur SaaS (onglet produit **SharePoint/OneDrive**) pour préparer une
 migration SharePoint Online tenant à tenant. Le SaaS tourne avec des tokens
 délégués (Graph REST uniquement) : tout ce qui exige SharePoint Online
 Management Shell ou PnP PowerShell se fait ici, depuis un poste admin.
@@ -16,7 +16,7 @@ Management Shell ou PnP PowerShell se fait ici, depuis un poste admin.
 | Sous-sites : WebTemplate/Configuration/Language, permissions uniques, navigation, groupes/membres, features, pages modernes, WebParts, listes/champs/types de contenu, paramètres régionaux | — | ✅ `scripts/Get-PnPWebInventory.ps1` |
 | Content types : nom, groupe, flag hidden, type de base, par site | ✅ section SaaS **Content types** (par collection de sites, filtre All / Non-hidden) | ✅ `scripts/Get-PnPWebInventory.ps1` (par web/liste — niveau fin, complément du niveau site SaaS) |
 | Term store : groupes > sets + nombre de termes | ✅ section SaaS **Term store** | — (labels/hiérarchie des termes : portail ou PnP manuel) |
-| OneDrive : quotas, sharing ODB, rétention post-départ (DeletedUserPersonalSiteRetentionDays) | ✅ SaaS SharePoint > **SharePoint/OneDrive** (settings) | ✅ `scripts/Get-SPOTenantSharing.ps1` (reste ODB : link defaults, expirations…) + `Get-SPOSite -IncludePersonalSite` (inventaire sites personnels + orphelins, propriétaires réels — seule source fiable, les rapports Graph identifiant les orphelins par IDs non résolvables) |
+| OneDrive : quotas, sharing ODB, rétention post-départ (DeletedUserPersonalSiteRetentionDays) | ✅ section SaaS **Sharing settings** (produit **SharePoint/OneDrive**, catégorie **OneDrive**) | ✅ `scripts/Get-SPOTenantSharing.ps1` (reste ODB : link defaults, expirations…) + `Get-SPOSite -IncludePersonalSite` (inventaire sites personnels + orphelins, propriétaires réels — seule source fiable, les rapports Graph identifiant les orphelins par IDs non résolvables) |
 | Stratégie de partage tenant : TenantName, SharingCapability, RequireAcceptingAccountMatchInvitedAccount, SharingDomainRestrictionMode, Allowed/BlockedDomainList | ✅ | — |
 | Stratégie de partage tenant : reste de `Get-SPOTenant` (DefaultSharingLinkType/Permission, expirations Anyone/Organization, EmailAttestation*, BccExternalSharing*, OneDriveForGuestsEnabled, ODBMembersCanShare, ODBAccessRequests, PeoplePicker guest suggestions…) | — | ✅ `Get-SPOTenantSharing.ps1` |
 
