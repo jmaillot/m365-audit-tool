@@ -27,7 +27,7 @@ Tous les CSV sont `;`-délimités, UTF-8 — même convention que l'outil SaaS.
 ## Usage
 
 ```powershell
-.\Get-EntraConnectInventory.ps1 -OutDir .\out
+.\scripts\Get-EntraConnectInventory.ps1 -OutDir .\out
 # -> SyncScheduler.csv, Connectors.csv, Partitions.csv, SyncRules.csv
 ```
 

@@ -39,13 +39,13 @@ All CSVs are `;`-delimited, UTF-8 — same convention as the SaaS tool.
 
 ```powershell
 # Full inventory (users capped at -UserResultSize, default 10000)
-.\Get-TeamsVoiceInventory.ps1 -OutDir .\out
+.\scripts\Get-TeamsVoiceInventory.ps1 -OutDir .\out
 # -> TeamsCallingPolicies.csv, UserVoice.csv, VoiceRoutingPolicies.csv,
 #    VoiceRoutes.csv, PstnUsages.csv, DirectRoutingSBCs.csv
 #    (+ PhoneNumberAssignments-PS.csv when the cmdlet exists)
 
 # Faster triage: only EnterpriseVoice-enabled users in UserVoice.csv
-.\Get-TeamsVoiceInventory.ps1 -VoiceOnly -OutDir .\out
+.\scripts\Get-TeamsVoiceInventory.ps1 -VoiceOnly -OutDir .\out
 ```
 
 Tip: join `UserVoice.csv` (column `LineUri`) with the SaaS
@@ -57,12 +57,12 @@ policy before migration.
 
 ```powershell
 # Policy definitions + per-user assignments
-.\Get-TeamsPolicyInventory.ps1 -OutDir .\out
+.\scripts\Get-TeamsPolicyInventory.ps1 -OutDir .\out
 # -> TeamsMeetingPolicies.csv, TeamsMessagingPolicies.csv,
 #    TeamsBroadcastPolicies.csv, UserPolicyAssignments.csv
 
 # Definitions only (no per-user pass)
-.\Get-TeamsPolicyInventory.ps1 -DefinitionsOnly -OutDir .\out
+.\scripts\Get-TeamsPolicyInventory.ps1 -DefinitionsOnly -OutDir .\out
 ```
 
 Tip: join `UserPolicyAssignments.csv` with the SaaS `TeamsActivity-*.csv`

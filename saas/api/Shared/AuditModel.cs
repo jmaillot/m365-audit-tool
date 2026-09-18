@@ -179,6 +179,7 @@ namespace M365AuditTool
             SectionsSharePoint.Register();
             SectionsOneDrive.Register();
             SectionsDomains.Register();
+            SectionsEngage.Register();
             SectionsEntraID.Register();
             SectionsConditionalAccess.Register();
             SectionsIntune.Register();

@@ -379,7 +379,7 @@ namespace M365AuditTool
             section.AddGroup(tenant);
 
             var sharing = new AuditOptionGroup("sharing", "Sharing policy", GroupMode.MultiCheck); sharing.Columns = 2;
-            sharing.Hint = "Graph names differ slightly from Get-SPOTenant (RequireAcceptingAccountMatchInvitedAccount = isRequireAcceptingUserToMatchInvitedUserEnabled). Full detail (link defaults, expirations, attestation...): run sp-migration/Get-SPOTenantSharing.ps1 on an admin workstation.";
+            sharing.Hint = "Graph names differ slightly from Get-SPOTenant (RequireAcceptingAccountMatchInvitedAccount = isRequireAcceptingUserToMatchInvitedUserEnabled). Full detail (link defaults, expirations, attestation...): run sp-migration/scripts/Get-SPOTenantSharing.ps1 on an admin workstation.";
             sharing.AddProp("SharingCapability", true);
             sharing.AddProp("RequireAcceptingAccountMatchInvitedAccount", true);
             sharing.AddProp("SharingDomainRestrictionMode", true);
