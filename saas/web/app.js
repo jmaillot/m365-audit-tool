@@ -278,7 +278,7 @@ function listProducts() {
   // Exchange Online, SharePoint, Teams. Anything else (future products…)
   // alphabetical at the end.
   const seen = [...new Set(state.sections.map(productOf))];
-  const order = ["Licensing", "Entra ID", "Intune", "Conditional Access", "Purview", "Power Platform", "Exchange Online", "SharePoint", "Domains", "Viva Engage", "Teams"];
+  const order = ["Licensing", "Entra ID", "Intune", "Conditional Access", "Purview", "Power Platform", "Exchange Online", "SharePoint/OneDrive", "Domains", "Viva Engage", "Teams"];
   const rank = p => { const i = order.indexOf(p); return i === -1 ? order.length : i; };
   return seen.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }

@@ -40,8 +40,8 @@ namespace M365AuditTool
                 "Audit OneDrive-specific tenant sharing settings via Graph (one row). Shared capability and domain lists live in the SharePoint Sharing Policy section.",
                 "share",
                 AuditScope.Graph);
-            section.Category = "SharePoint/OneDrive";
-            section.Product = "SharePoint";
+            section.Category = "OneDrive";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "OneDriveSharing.csv";
             section.TipHtml = "Link defaults, expirations and attestation need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 

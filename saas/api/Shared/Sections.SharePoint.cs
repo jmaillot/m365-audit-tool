@@ -93,7 +93,7 @@ namespace M365AuditTool
                 "site",
                 AuditScope.Graph);
             section.Category = "SharePoint";
-            section.Product = "SharePoint";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSites.csv";
             section.TipHtml = "Non-group sites (communication/classic) need the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
@@ -272,7 +272,7 @@ namespace M365AuditTool
                 "site",
                 AuditScope.Graph);
             section.Category = "SharePoint";
-            section.Product = "SharePoint";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSubsites.csv";
             section.TipHtml = "Web-level config (template, language, unique permissions, navigation…) needs the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
@@ -370,7 +370,7 @@ namespace M365AuditTool
                 "shield",
                 AuditScope.Graph);
             section.Category = "SharePoint";
-            section.Product = "SharePoint";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSharing.csv";
             section.TipHtml = "Remaining Get-SPOTenant settings (link defaults, expirations, attestation…) need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
@@ -441,7 +441,7 @@ namespace M365AuditTool
                 "type",
                 AuditScope.Graph);
             section.Category = "SharePoint";
-            section.Product = "SharePoint";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointContentTypes.csv";
 
             var site = new AuditOptionGroup("site", "Site", GroupMode.MultiCheck); site.Columns = 1;
@@ -535,7 +535,7 @@ namespace M365AuditTool
                 "tag",
                 AuditScope.Graph);
             section.Category = "SharePoint";
-            section.Product = "SharePoint";
+            section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointTermStore.csv";
 
             var group = new AuditOptionGroup("group", "Group & set", GroupMode.MultiCheck); group.Columns = 1;
