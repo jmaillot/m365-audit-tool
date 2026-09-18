@@ -2,7 +2,7 @@ using System.IO.Packaging;
 using System.Text;
 using System.Xml;
 
-namespace ExchangeAuditSaaS;
+namespace M365AuditSaaS;
 
 // Dependency-free ;-delimited CSV -> single-sheet XLSX.
 // Bold header, frozen top row, autofilter, auto-width 12-60,
@@ -49,14 +49,14 @@ internal static class Xlsx
                 "application/vnd.openxmlformats-package.core-properties+xml", w =>
                 {
                     w.WriteStartElement("coreProperties", "http://schemas.openxmlformats.org/package/2006/metadata/core-properties");
-                    w.WriteElementString("title", "http://purl.org/dc/elements/1.1/", "Exchange Audit Export");
+                    w.WriteElementString("title", "http://purl.org/dc/elements/1.1/", "M365 Audit Export");
                     w.WriteEndElement();
                 });
             WritePart(package, "/docProps/app.xml",
                 "application/vnd.openxmlformats-officedocument.extended-properties+xml", w =>
                 {
                     w.WriteStartElement("Properties", "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties");
-                    w.WriteElementString("Application", "Exchange Audit SaaS");
+                    w.WriteElementString("Application", "M365 Audit SaaS");
                     w.WriteEndElement();
                 });
             WritePart(package, "/xl/workbook.xml",

@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("ExchangeAuditTool.Tests")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("M365AuditTool.Tests")]
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     internal static class PsScriptHelpers
     {

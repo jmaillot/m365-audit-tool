@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     // "SharePoint" category (Microsoft Graph, NOT Exchange Online) for
     // tenant-to-tenant migration prep:
@@ -25,6 +25,8 @@ namespace ExchangeAuditTool
             AuditRegistry.Register(BuildSitesSection());
             AuditRegistry.Register(BuildSubsitesSection());
             AuditRegistry.Register(BuildSharingSection());
+            AuditRegistry.Register(BuildContentTypesSection());
+            AuditRegistry.Register(BuildTermStoreSection());
         }
 
         private static List<string> Collect(AuditSelection sel, params string[] groupKeys)
@@ -33,7 +35,7 @@ namespace ExchangeAuditTool
         }
 
         private const string GraphHeaders =
-            "$headers = @{ Authorization = ('Bearer ' + $env:EAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual'; Prefer = 'include-unknown-enum-members' }";
+            "$headers = @{ Authorization = ('Bearer ' + $env:MAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual'; Prefer = 'include-unknown-enum-members' }";
 
         private static string SizePrelude(string size)
         {
@@ -93,7 +95,7 @@ namespace ExchangeAuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint";
             section.DefaultFileName = "SharePointSites.csv";
-            section.TipHtml = "Non-group sites (communication/classic) need the standalone admin scripts: <a href='https://github.com/jmaillot/exchange-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Non-group sites (communication/classic) need the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var site = new AuditOptionGroup("site", "Site columns", GroupMode.MultiCheck); site.Columns = 2;
             site.AddProp("SiteId", true);
@@ -272,7 +274,7 @@ namespace ExchangeAuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint";
             section.DefaultFileName = "SharePointSubsites.csv";
-            section.TipHtml = "Web-level config (template, language, unique permissions, navigation…) needs the standalone admin scripts: <a href='https://github.com/jmaillot/exchange-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Web-level config (template, language, unique permissions, navigation…) needs the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var sub = new AuditOptionGroup("subsite", "Subsite columns", GroupMode.MultiCheck); sub.Columns = 2;
             sub.AddProp("SiteId", true);
@@ -370,7 +372,7 @@ namespace ExchangeAuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint";
             section.DefaultFileName = "SharePointSharing.csv";
-            section.TipHtml = "Remaining Get-SPOTenant settings (link defaults, expirations, attestation…) need the standalone script: <a href='https://github.com/jmaillot/exchange-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Remaining Get-SPOTenant settings (link defaults, expirations, attestation…) need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var tenant = new AuditOptionGroup("tenant", "Tenant", GroupMode.MultiCheck); tenant.Columns = 1;
             tenant.AddProp("TenantName", true);
@@ -415,6 +417,163 @@ namespace ExchangeAuditTool
                 sb.AppendLine("    RequireAcceptingAccountMatchInvitedAccount = $ra; SharingDomainRestrictionMode = $drm;");
                 sb.AppendLine("    SharingAllowedDomainList = $al; SharingBlockedDomainList = $bl");
                 sb.AppendLine("})");
+                sb.AppendLine("$rows = $rows | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 4. CONTENT TYPES
+        // Content types per group-connected site: one row per site x content
+        // type (name, group, hidden flag, base type). System/hidden types are
+        // noise for most migrations - the scope radio hides them.
+        private static AuditSection BuildContentTypesSection()
+        {
+            var section = new AuditSection(
+                "sharepoint-contenttypes",
+                "Content types",
+                "SharePoint content types export",
+                "Audit content types per group-connected site via Graph: one row per site x content type (slow per-site lookup). Non-group sites are not covered.",
+                "type",
+                AuditScope.Graph);
+            section.Category = "SharePoint";
+            section.Product = "SharePoint";
+            section.DefaultFileName = "SharePointContentTypes.csv";
+
+            var site = new AuditOptionGroup("site", "Site", GroupMode.MultiCheck); site.Columns = 1;
+            site.AddProp("SiteUrl", true);
+            site.AddProp("SiteTitle", true);
+            section.AddGroup(site);
+
+            var type = new AuditOptionGroup("type", "Content type", GroupMode.MultiCheck); type.Columns = 2;
+            type.AddProp("ContentTypeName", true);
+            type.AddProp("ContentTypeGroup", true);
+            type.AddProp("Hidden", true);
+            type.AddProp("BaseType", true);
+            section.AddGroup(type);
+
+            var scope = new AuditOptionGroup("scope", "Scope", GroupMode.SingleChoice); scope.Columns = 2;
+            scope.Hint = "System and hidden content types exist on every site - hide them to focus on custom types.";
+            scope.Add(new AuditOption("nonhidden", "Hide hidden & system types", "nonhidden", true));
+            scope.Add(new AuditOption("all", "All content types", "all", false));
+            section.AddGroup(scope);
+
+            PsScriptHelpers.AddSizeGroup(section);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "site", "type");
+                if (chosen.Count == 0) chosen.Add("ContentTypeName");
+                string selectList = string.Join(", ", chosen.ToArray());
+                string size = sel.First("size", "Unlimited");
+                bool hideHidden = sel.First("scope", "nonhidden") == "nonhidden";
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying group-connected sites (Graph)...'");
+                sb.AppendLine(GraphHeaders);
+                sb.AppendLine(SizePrelude(size));
+                sb.AppendLine("$groups = @()");
+                sb.AppendLine("$guri = 'https://graph.microsoft.com/v1.0/groups?$filter=resourceProvisioningOptions/Any(x:x eq ''Team'')&$select=id,displayName&$top=999'");
+                sb.AppendLine("while ($guri -and ($maxSites -lt 0 -or $groups.Count -lt $maxSites)) {");
+                sb.AppendLine("    $gr = Invoke-RestMethod -Uri $guri -Headers $headers -Method Get -ErrorAction Stop");
+                sb.AppendLine("    $groups += @($gr.value)");
+                sb.AppendLine("    $guri = $gr.'@odata.nextLink'");
+                sb.AppendLine("}");
+                sb.AppendLine("if ($maxSites -ge 0 -and $groups.Count -gt $maxSites) { $groups = $groups[0..($maxSites - 1)] }");
+                sb.AppendLine("Write-Host (\"Retrieved {0} group(s).\" -f $groups.Count)");
+                sb.AppendLine("$rows = New-Object System.Collections.Generic.List[object]");
+                sb.AppendLine("$i = 0; $ctFail = 0");
+                sb.AppendLine("foreach ($g in $groups) {");
+                sb.AppendLine("    $i++; if (($i % 20) -eq 0) { Write-Host (\"  ... {0}/{1}\" -f $i, $groups.Count) }");
+                sb.AppendLine("    $gid = [string]$g.id");
+                sb.AppendLine("    $st = $null");
+                sb.AppendLine("    try { $st = Invoke-RestMethod -Uri (\"https://graph.microsoft.com/v1.0/groups/\" + $gid + \"/sites/root?$select=id,displayName,webUrl\") -Headers $headers -Method Get -ErrorAction Stop } catch { if ($_.Exception.Message -notmatch '404') { Write-Host (\"  WARNING: site lookup failed: \" + $_.Exception.Message) } }");
+                sb.AppendLine("    if (-not $st) { continue }");
+                sb.AppendLine("    $sid = [string]$st.id; $su = [string]$st.webUrl; $sti = [string]$st.displayName");
+                sb.AppendLine("    try {");
+                sb.AppendLine("        $ct = @(); $curi = \"https://graph.microsoft.com/v1.0/sites/\" + $sid + \"/contentTypes\"");
+                sb.AppendLine("        while ($curi) { $cr = Invoke-RestMethod -Uri $curi -Headers $headers -Method Get -ErrorAction Stop; $ct += @($cr.value); $curi = $cr.'@odata.nextLink' }");
+                sb.AppendLine("        foreach ($t in $ct) {");
+                if (hideHidden)
+                    sb.AppendLine("            try { if ([bool]$t.hidden) { continue } } catch { }");
+                sb.AppendLine("            $bt = ''; try { $bt = [string]$t.base.name; if (-not $bt) { $bt = [string]$t.base.id } } catch { }");
+                sb.AppendLine("            $rows.Add([pscustomobject]@{");
+                sb.AppendLine("                SiteUrl = $su; SiteTitle = $sti; ContentTypeName = $t.name; ContentTypeGroup = $t.group;");
+                sb.AppendLine("                Hidden = $t.hidden; BaseType = $bt");
+                sb.AppendLine("            })");
+                sb.AppendLine("        }");
+                sb.AppendLine("    } catch { $ctFail++; Write-Host (\"  WARNING: content types of site '{0}' failed: \" -f $su + $_.Exception.Message) }");
+                sb.AppendLine("}");
+                sb.AppendLine("if ($ctFail -gt 0) { Write-Host (\"WARNING: {0} content-type querie(s) failed (consent for Sites.Read.All?).\" -f $ctFail) }");
+                sb.AppendLine("if ($rows.Count -eq 0) { $rows.Add([pscustomobject]@{ SiteUrl = ''; SiteTitle = ''; ContentTypeName = ''; ContentTypeGroup = ''; Hidden = ''; BaseType = '' }) }");
+                sb.AppendLine("$rows = $rows | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 5. TERM STORE
+        // Managed metadata: term groups and term sets from the tenant term
+        // store (via the root site), one row per set with term counts.
+        // Individual terms/labels are portal/PnP territory - counts scope the
+        // rebuild. Needs Sites.Read.All (already required).
+        private static AuditSection BuildTermStoreSection()
+        {
+            var section = new AuditSection(
+                "sharepoint-termstore",
+                "Term store",
+                "Term store export",
+                "Audit managed metadata via Graph: term groups and sets with term counts (one row per set). Term labels and hierarchy need PnP or the portal. Needs TermStore.Read.All.",
+                "tag",
+                AuditScope.Graph);
+            section.Category = "SharePoint";
+            section.Product = "SharePoint";
+            section.DefaultFileName = "SharePointTermStore.csv";
+
+            var group = new AuditOptionGroup("group", "Group & set", GroupMode.MultiCheck); group.Columns = 1;
+            group.AddProp("GroupName", true);
+            group.AddProp("SetName", true);
+            group.AddProp("Description", true);
+            group.AddProp("TermsCount", true);
+            section.AddGroup(group);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "group");
+                if (chosen.Count == 0) chosen.Add("SetName");
+                string selectList = string.Join(", ", chosen.ToArray());
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying term store (Graph)...'");
+                sb.AppendLine(GraphHeaders);
+                sb.AppendLine("$storeId = ''");
+                sb.AppendLine("try { $ts = Invoke-RestMethod -Uri 'https://graph.microsoft.com/v1.0/sites/root/termStore' -Headers $headers -Method Get -ErrorAction Stop; $storeId = [string]$ts.id } catch { Write-Host ('WARNING: term store lookup failed (' + $_.Exception.Message + ' - consent for TermStore.Read.All?)') }");
+                sb.AppendLine("$tgroups = @()");
+                sb.AppendLine("if ($storeId) { try { $guri = 'https://graph.microsoft.com/v1.0/sites/root/termStore/groups'; while ($guri) { $gr = Invoke-RestMethod -Uri $guri -Headers $headers -Method Get -ErrorAction Stop; $tgroups += @($gr.value); $guri = $gr.'@odata.nextLink' } } catch { Write-Host ('WARNING: term groups query failed (' + $_.Exception.Message + ')') } }");
+                sb.AppendLine("Write-Host (\"Retrieved {0} term group(s).\" -f $tgroups.Count)");
+                sb.AppendLine("$rows = New-Object System.Collections.Generic.List[object]");
+                sb.AppendLine("$setFail = 0; $cntFail = 0");
+                sb.AppendLine("foreach ($tg in $tgroups) {");
+                sb.AppendLine("    $tgid = [string]$tg.id; $tgn = [string]$tg.displayName; if (-not $tgn) { $tgn = [string]$tg.name }");
+                sb.AppendLine("    $sets = @()");
+                sb.AppendLine("    try { $suri = (\"https://graph.microsoft.com/v1.0/sites/root/termStore/groups/\" + $tgid + \"/sets\"); while ($suri) { $sr = Invoke-RestMethod -Uri $suri -Headers $headers -Method Get -ErrorAction Stop; $sets += @($sr.value); $suri = $sr.'@odata.nextLink' } } catch { $setFail++; continue }");
+                sb.AppendLine("    foreach ($ts2 in $sets) {");
+                sb.AppendLine("        $tc = ''; try { $cr = Invoke-RestMethod -Uri (\"https://graph.microsoft.com/v1.0/sites/root/termStore/groups/\" + $tgid + \"/sets/\" + [string]$ts2.id + \"/terms/`$count\") -Headers $headers -Method Get -ErrorAction Stop; $tc = [string]$cr } catch { $cntFail++ }");
+                sb.AppendLine("        $rows.Add([pscustomobject]@{ GroupName = $tgn; SetName = $ts2.localizedNames[0].name; Description = $ts2.description; TermsCount = $tc })");
+                sb.AppendLine("        if (-not $rows[$rows.Count - 1].SetName) { $rows[$rows.Count - 1].SetName = [string]$ts2.name }");
+                sb.AppendLine("    }");
+                sb.AppendLine("}");
+                sb.AppendLine("if ($setFail -gt 0) { Write-Host (\"WARNING: {0} term-set querie(s) failed.\" -f $setFail) }");
+                sb.AppendLine("if ($cntFail -gt 0) { Write-Host (\"WARNING: {0} term-count querie(s) failed.\" -f $cntFail) }");
+                sb.AppendLine("if ($rows.Count -eq 0) { $rows.Add([pscustomobject]@{ GroupName = ''; SetName = ''; Description = ''; TermsCount = '' }) }");
                 sb.AppendLine("$rows = $rows | Select-Object " + selectList);
                 sb.AppendLine();
                 sb.Append(ctx.ExportCsv("$rows"));

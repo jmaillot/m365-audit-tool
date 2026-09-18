@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
-    internal enum AuditScope { ExchangeOnline, OnPremises, Both, Graph }
+    internal enum AuditScope { ExchangeOnline, OnPremises, Both, Graph, PowerPlatform }
 
     internal enum GroupMode { MultiCheck, SingleChoice }
 
@@ -164,16 +164,24 @@ namespace ExchangeAuditTool
             Sections.Clear();
             SectionsMailboxes.RegisterMailboxSections();
             SectionsMailboxTypes.Register();
+            SectionsBookings.Register();
             SectionsGroups.Register();
             SectionsContacts.Register();
             SectionsPublicFolders.Register();
             SectionsDomainsRouting.Register();
             SectionsOrganization.Register();
             SectionsProtection.Register();
+            SectionsPurview.Register();
+            SectionsPowerPlatform.Register();
+            SectionsPurviewGovernance.Register();
             SectionsLicenses.Register();
             SectionsTeams.Register();
             SectionsSharePoint.Register();
+            SectionsOneDrive.Register();
+            SectionsDomains.Register();
             SectionsEntraID.Register();
+            SectionsConditionalAccess.Register();
+            SectionsIntune.Register();
             // Product drives the web product tabs + left-nav filter. New
             // products (Teams, SharePoint…) just set section.Product explicitly;
             // everything else falls back here so old sections keep working.

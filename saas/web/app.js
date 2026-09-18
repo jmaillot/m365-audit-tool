@@ -1,6 +1,6 @@
-/* Exchange Audit SaaS - Azure Portal style blade. No build step. */
+/* M365 Audit SaaS - Azure Portal style blade. No build step. */
 const API = "";
-const state = { sections: [], current: null, activeProduct: "", checks: {}, smartMode: true, token: "", tokenExp: 0, graphToken: "", graphTokenExp: 0, restoring: false, org: "", upn: "", jobId: null, jobSection: null, jobStart: 0, poll: null, msal: null, msalAccount: null, connLabel: null };
+const state = { sections: [], current: null, activeProduct: "", checks: {}, smartMode: true, token: "", tokenExp: 0, graphToken: "", graphTokenExp: 0, powerToken: "", powerTokenExp: 0, restoring: false, org: "", upn: "", jobId: null, jobSection: null, jobStart: 0, poll: null, msal: null, msalAccount: null, connLabel: null };
 // UI chrome dictionary. Anything served by /api/sections (section/category/
 // group/option names, CSV columns) is NEVER translated on purpose.
 const I18N = {
@@ -20,7 +20,7 @@ en: {
   crumbConnection: "Connection",
   slowBadge: "Slow options selected - this run may take longer",
   filterOptions: "Filter options",
-  selectAll: "Select all", deselectAll: "Deselect all", selectAllCount: "Select all ({on}/{total})", deselectSlow: "Deselect slow",
+  selectAll: "Select all", deselectAll: "Deselect all", selectAllCount: "Select all ({on}/{total})", deselectSlow: "Deselect slow", selectSlow: "Select slow",
   dlCsv: "Download CSV", dlXlsx: "Download XLSX",
   runAudit: "RUN AUDIT", cancelBtn: "Cancel",
   resultsPreview: "Results preview", resultsTable: "Results", noResults: "No results yet.",
@@ -28,7 +28,7 @@ en: {
   connectedAs: "Connected: {label}", notConnected: "Not connected",
   statusConnected: "Connected (tab-session token).", statusDisconnected: "Disconnected, token dropped.",
   enterUpn: "Enter your work email (UPN).",
-  serverNotConfigured: "Server not configured: missing clientId (see .env EAT_CLIENT_ID).",
+  serverNotConfigured: "Server not configured: missing clientId (see .env MAT_CLIENT_ID).",
   msalUnavailable: "Microsoft login unavailable — please contact your administrator.",
   openingSignin: "Opening Microsoft sign-in...",
   signedInLog: "Signed in as {upn} (tenant {org}). Tab-session token.",
@@ -65,7 +65,7 @@ fr: {
   crumbConnection: "Connexion",
   slowBadge: "Options lentes sélectionnées — l'exécution sera bien plus longue",
   filterOptions: "Filtrer les options",
-  selectAll: "Tout sélectionner", deselectAll: "Tout désélectionner", selectAllCount: "Tout sélectionner ({on}/{total})", deselectSlow: "Décocher lentes",
+  selectAll: "Tout sélectionner", deselectAll: "Tout désélectionner", selectAllCount: "Tout sélectionner ({on}/{total})", deselectSlow: "Décocher lentes", selectSlow: "Cocher lentes",
   dlCsv: "Télécharger CSV", dlXlsx: "Télécharger XLSX",
   runAudit: "LANCER L'AUDIT", cancelBtn: "Annuler",
   resultsPreview: "Aperçu des résultats", resultsTable: "Résultats", noResults: "Aucun résultat pour l'instant.",
@@ -73,7 +73,7 @@ fr: {
   connectedAs: "Connecté : {label}", notConnected: "Non connecté",
   statusConnected: "Connecté (jeton de session).", statusDisconnected: "Déconnecté, jeton supprimé.",
   enterUpn: "Saisissez votre e-mail professionnel (UPN).",
-  serverNotConfigured: "Serveur non configuré : clientId manquant (voir .env EAT_CLIENT_ID).",
+  serverNotConfigured: "Serveur non configuré : clientId manquant (voir .env MAT_CLIENT_ID).",
   msalUnavailable: "Connexion Microsoft indisponible — contactez votre administrateur.",
   openingSignin: "Ouverture de la connexion Microsoft…",
   signedInLog: "Connecté en tant que {upn} (tenant {org}). Jeton de session.",
@@ -95,7 +95,7 @@ fr: {
   sectionsLoadedLog: "{n} sections chargées depuis l'API."
 }};
 let lang = "en";
-try { lang = localStorage.getItem("eat.lang") || ((navigator.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en"); } catch (e) {}
+try { lang = localStorage.getItem("mat.lang") || ((navigator.language || "en").toLowerCase().startsWith("fr") ? "fr" : "en"); } catch (e) {}
 if (!I18N[lang]) lang = "en";
 function t(key, vars) {
   let s = (I18N[lang] && I18N[lang][key]) ?? I18N.en[key] ?? key;
@@ -154,7 +154,7 @@ function refreshResultInfoLang() {
 }
 function setLang(l) {
   lang = I18N[l] ? l : "en";
-  try { localStorage.setItem("eat.lang", lang); } catch (e) {}
+  try { localStorage.setItem("mat.lang", lang); } catch (e) {}
   applyI18n();
   renderProductTabs();
   renderNav();
@@ -164,14 +164,15 @@ function setLang(l) {
   else showView(vis || "home");
 }
 // Defaults; /api/config (backed by saas/.env) overrides, web/config.js is the fallback.
-const EAT_CFG = Object.assign(
-  { clientId: "", msalSources: ["./msal-browser.min.js"], exoScopes: ["https://outlook.office365.com/.default"], graphScopes: ["User.Read.All", "Organization.Read.All", "Group.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "TeamMember.Read.All", "ChannelMember.Read.All", "TeamsAppInstallation.ReadForTeam", "TeamsTab.Read.All", "Reports.Read.All", "ChannelMessage.Read.All", "Sites.Read.All", "SharePointTenantSettings.Read.All", "AuditLog.Read.All", "UserAuthenticationMethod.Read.All", "RoleManagement.Read.Directory"] },
-  window.EAT_CONFIG || {});
+const MAT_CFG = Object.assign(
+  { clientId: "", msalSources: ["./msal-browser.min.js"], exoScopes: ["https://outlook.office365.com/.default"], graphScopes: ["User.Read.All", "Organization.Read.All", "Group.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "TeamMember.Read.All", "ChannelMember.Read.All", "TeamsAppInstallation.ReadForTeam", "TeamsTab.Read.All", "Reports.Read.All", "ChannelMessage.Read.All", "Sites.Read.All", "SharePointTenantSettings.Read.All", "AuditLog.Read.All", "UserAuthenticationMethod.Read.All", "RoleManagement.Read.Directory", "Directory.Read.All", "AdministrativeUnit.Read.All", "Policy.Read.All", "IdentityProvider.Read.All", "IdentityUserFlow.Read.All", "PrivilegedEligibilitySchedule.Read.AzureADGroup", "PrivilegedAssignmentSchedule.Read.AzureADGroup", "AccessReview.Read.All", "Application.Read.All", "Synchronization.Read.All", "Agreement.Read.All", "Device.Read.All", "TeamsTelephoneNumber.Read.All", "EntitlementManagement.Read.All", "CustomSecAttributeDefinition.Read.All", "CustomSecAttributeAssignment.Read.All", "Domain.Read.All", "IdentityRiskyUser.Read.All", "TermStore.Read.All", "Bookings.Read.All"], powerScopes: ["https://api.powerplatform.com/EnvironmentManagement.Environments.Read", "https://api.powerplatform.com/PowerAutomate.Flows.Read", "https://api.powerplatform.com/PowerApps.Apps.Read", "https://api.powerplatform.com/Connectivity.Connectors.Read"] },
+  window.MAT_CONFIG || {});
 fetch("api/config").then(r => r.json()).then(c => {
-  if (c.clientId) EAT_CFG.clientId = c.clientId;
-  if (c.msalSources && c.msalSources.length) EAT_CFG.msalSources = c.msalSources;
-  if (c.exoScopes && c.exoScopes.length) EAT_CFG.exoScopes = c.exoScopes;
-  if (c.graphScopes && c.graphScopes.length) EAT_CFG.graphScopes = c.graphScopes;
+  if (c.clientId) MAT_CFG.clientId = c.clientId;
+  if (c.msalSources && c.msalSources.length) MAT_CFG.msalSources = c.msalSources;
+  if (c.exoScopes && c.exoScopes.length) MAT_CFG.exoScopes = c.exoScopes;
+  if (c.graphScopes && c.graphScopes.length) MAT_CFG.graphScopes = c.graphScopes;
+  if (c.powerScopes && c.powerScopes.length) MAT_CFG.powerScopes = c.powerScopes;
   updateRegisterLink();
   // Config may arrive after the first restore attempt (clientId was empty):
   // retry the silent session restore once it is known.
@@ -188,6 +189,7 @@ function log(msg) {
 function authHeaders() {
   const h = { "Content-Type": "application/json", "Authorization": "Bearer " + state.token, "X-Tenant-Id": state.org };
   if (state.graphToken) h["X-Graph-Token"] = "Bearer " + state.graphToken;
+  if (state.powerToken) h["X-Power-Token"] = "Bearer " + state.powerToken;
   return h;
 }
 
@@ -220,7 +222,12 @@ function renderNav() {
     { id: "__home", title: t("navConnection"), view: "home" },
     { id: "__activity", title: t("navActivity"), view: "activity" }
   ] }];
-  Object.keys(cats).sort().forEach(cat => {
+  // Left-nav category order. Listed categories come first in this order
+  // (Entra ID sub-categories); anything else stays alphabetical after them,
+  // so other product tabs keep their current ordering.
+  const CAT_ORDER = ["Standard Objects", "Applications", "RBAC", "Tenant Settings", "Identity Governance"];
+  const catRank = c => { const i = CAT_ORDER.indexOf(c); return i === -1 ? CAT_ORDER.length : i; };
+  Object.keys(cats).sort((a, b) => catRank(a) - catRank(b) || a.localeCompare(b)).forEach(cat => {
     const items = cats[cat].map(s => ({ id: s.id, title: s.navTitle }));
     if (items.length) groups.push({ cat, items });
   });
@@ -267,22 +274,24 @@ function productLabel(p) {
   return p || "";
 }
 function listProducts() {
-  // Stable order: Exchange Online first, Licensing last, anything else
-  // (Teams, future products…) alphabetical in between.
+  // Explicit tab order: Licensing, Entra ID, Intune, Conditional Access,
+  // Exchange Online, SharePoint, Teams. Anything else (future products…)
+  // alphabetical at the end.
   const seen = [...new Set(state.sections.map(productOf))];
-  const rank = p => p === "Exchange Online" ? 0 : p === "Licensing" ? 2 : 1;
+  const order = ["Licensing", "Entra ID", "Intune", "Conditional Access", "Purview", "Power Platform", "Exchange Online", "SharePoint", "OneDrive", "Domains", "Teams"];
+  const rank = p => { const i = order.indexOf(p); return i === -1 ? order.length : i; };
   return seen.sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
 }
 function initActiveProduct() {
   let saved = "";
-  try { saved = localStorage.getItem("eat.product") || ""; } catch (e) {}
+  try { saved = localStorage.getItem("mat.product") || ""; } catch (e) {}
   const products = listProducts();
   state.activeProduct = products.includes(saved) ? saved : (products[0] || "Exchange Online");
 }
 function setActiveProduct(p) {
   if (!p || p === state.activeProduct) return;
   state.activeProduct = p;
-  try { localStorage.setItem("eat.product", p); } catch (e) {}
+  try { localStorage.setItem("mat.product", p); } catch (e) {}
   renderProductTabs(); renderNav(); renderCoverage(); applyTopSearch();
   if (state.current && productOf(state.current) !== p) {
     // Stay on the open section (its options/results are untouched); only the
@@ -347,7 +356,7 @@ function openSection(id) {
   // the left nav stays consistent with the open section.
   if (productOf(s) !== state.activeProduct) {
     state.activeProduct = productOf(s);
-    try { localStorage.setItem("eat.product", state.activeProduct); } catch (e) {}
+    try { localStorage.setItem("mat.product", state.activeProduct); } catch (e) {}
     renderProductTabs(); renderNav(); renderCoverage();
   }
   // Reopening the section of a known job resumes its live view instead of
@@ -457,8 +466,9 @@ function sectionHasSlow() {
 function updateSlow() {
   const slow = state.current.groups.some(g => (g.options || []).some(o => (o.slow || g.slow) && state.checks[g.key + "::" + o.value]));
   $("slowBadge").classList.toggle("hidden", !slow);
-  // One-click fast pass: visible only in sections that define slow options.
-  $("deselectSlow").textContent = t("deselectSlow");
+  // Toggle button: offers to deselect when any slow option is on,
+  // to select when they are all off. Visible in sections with slow options.
+  $("deselectSlow").textContent = slow ? t("deselectSlow") : t("selectSlow");
   $("deselectSlow").classList.toggle("hidden", !sectionHasSlow());
 }
 function updateSelectAll() {
@@ -492,6 +502,11 @@ async function runAudit() {
     catch (e) { $("resultInfo").textContent = t("sessionExpired"); log(t("tokenRefreshFailedLog", { err: e.message || e })); return; }
     if (!state.graphToken) { alert(t("connectFirstAlert")); showView("home"); return; }
   }
+  if (state.current && state.current.scope === "PowerPlatform" && !state.powerToken) {
+    try { await ensurePowerToken(false); }
+    catch (e) { $("resultInfo").textContent = t("sessionExpired"); log(t("tokenRefreshFailedLog", { err: e.message || e })); return; }
+    if (!state.powerToken) { alert(t("connectFirstAlert")); showView("home"); return; }
+  }
   const sel = selection();
   const nativeAuto = state.current.groups.some(g => g.key === "auto");
   const smart = nativeAuto ? (sel.auto || []).includes("autodetect") : state.smartMode;
@@ -511,11 +526,11 @@ async function runAudit() {
 }
 function persistJob() {
   // Job tracking only (no token): survives a page reload, dies with the tab.
-  try { sessionStorage.setItem("eat.lastJob", JSON.stringify({ jobId: state.jobId, section: state.jobSection, start: state.jobStart, org: state.org })); } catch (e) {}
+  try { sessionStorage.setItem("mat.lastJob", JSON.stringify({ jobId: state.jobId, section: state.jobSection, start: state.jobStart, org: state.org })); } catch (e) {}
 }
 async function restoreJob() {
   let saved = null;
-  try { saved = JSON.parse(sessionStorage.getItem("eat.lastJob") || "null"); } catch (e) {}
+  try { saved = JSON.parse(sessionStorage.getItem("mat.lastJob") || "null"); } catch (e) {}
   if (!saved || !saved.jobId || !saved.section) return;
   state.jobId = saved.jobId; state.jobSection = saved.section; state.jobStart = saved.start || Date.now();
   state.org = saved.org || ""; if (state.org && !$("org").value) $("org").value = state.org;
@@ -527,7 +542,7 @@ async function restoreJob() {
     // Finished jobs: stay on Connection; reopening their section restores the view.
   } catch (e) {
     state.jobId = null; state.jobSection = null;
-    try { sessionStorage.removeItem("eat.lastJob"); } catch (e2) {}
+    try { sessionStorage.removeItem("mat.lastJob"); } catch (e2) {}
   }
 }
 function fmtElapsed(ms) {
@@ -541,7 +556,7 @@ async function fetchJobStatus() {
     pollStop(); $("runBtn").disabled = false; $("cancelBtn").disabled = true;
     $("resultInfo").textContent = t("jobGone", { id: state.jobId });
     state.jobId = null; state.jobSection = null;
-    try { sessionStorage.removeItem("eat.lastJob"); } catch (e) {}
+    try { sessionStorage.removeItem("mat.lastJob"); } catch (e) {}
     return;
   }
   const j = await r.json();
@@ -581,9 +596,10 @@ function esc(s) { return String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;"
 
 $("deselectSlow").onclick = () => {
   if (!state.current) return;
+  const anyOn = state.current.groups.some(g => g.mode !== "SingleChoice" && (g.options || []).some(o => (o.slow || g.slow) && state.checks[g.key + "::" + o.value]));
   state.current.groups.forEach(g => {
     if (g.mode === "SingleChoice") return;
-    (g.options || []).forEach(o => { if (o.slow || g.slow) state.checks[g.key + "::" + o.value] = false; });
+    (g.options || []).forEach(o => { if (o.slow || g.slow) state.checks[g.key + "::" + o.value] = !anyOn; });
   });
   renderGroups($("filter").value); updateSlow();
 };
@@ -618,7 +634,7 @@ function setConnected(label) {
   refreshConnText();
 }
 function setDisconnected(msg) {
-  state.token = ""; state.tokenExp = 0; state.graphToken = ""; state.graphTokenExp = 0; state.msalAccount = null; state.jobId = null; state.connLabel = null; pollStop();
+  state.token = ""; state.tokenExp = 0; state.graphToken = ""; state.graphTokenExp = 0; state.powerToken = ""; state.powerTokenExp = 0; state.msalAccount = null; state.jobId = null; state.connLabel = null; pollStop();
   $("homeStatus").textContent = msg || t("statusDisconnected");
   refreshConnText();
 }
@@ -629,9 +645,9 @@ function upnDomain(upn) {
 function updateRegisterLink() {
   const d = upnDomain($("upn").value) || $("org").value.trim();
   const a = $("registerLink");
-  if (d && EAT_CFG.clientId && EAT_CFG.clientId.indexOf("PASTE") !== 0) {
+  if (d && MAT_CFG.clientId && MAT_CFG.clientId.indexOf("PASTE") !== 0) {
     a.href = "https://login.microsoftonline.com/" + encodeURIComponent(d) +
-      "/adminconsent?client_id=" + encodeURIComponent(EAT_CFG.clientId);
+      "/adminconsent?client_id=" + encodeURIComponent(MAT_CFG.clientId);
     a.style.display = "";
   } else a.style.display = "none";
 }
@@ -651,7 +667,7 @@ $("upn").oninput = () => {
 $("org").oninput = updateRegisterLink;
 async function loadMsal() {
   if (!window.msal) {
-    for (const src of (EAT_CFG.msalSources || ["./msal-browser.min.js"])) {
+    for (const src of (MAT_CFG.msalSources || ["./msal-browser.min.js"])) {
       try { await loadScript(src); if (window.msal) break; }
       catch (e) { log(t("msalLoadLog", { src })); }
     }
@@ -662,7 +678,7 @@ async function buildMsal(domain) {
   // Tab-lifetime session: tokens survive F5 (sessionStorage), die with the
   // tab, never touch disk (no localStorage), never reach our servers.
   const app = new window.msal.PublicClientApplication({
-    auth: { clientId: EAT_CFG.clientId, authority: "https://login.microsoftonline.com/" + domain },
+    auth: { clientId: MAT_CFG.clientId, authority: "https://login.microsoftonline.com/" + domain },
     cache: { cacheLocation: "sessionStorage" }
   });
   if (app.initialize) await app.initialize(); // MSAL v3+: required before any API call
@@ -672,9 +688,9 @@ function persistSession(domain) {
   // Non-sensitive routing hints only (org/domain/UPN). Tokens stay inside
   // MSAL's own sessionStorage entries and are never handled here.
   try {
-    sessionStorage.setItem("eat.org", state.org);
-    sessionStorage.setItem("eat.domain", domain);
-    sessionStorage.setItem("eat.upn", state.upn);
+    sessionStorage.setItem("mat.org", state.org);
+    sessionStorage.setItem("mat.domain", domain);
+    sessionStorage.setItem("mat.upn", state.upn);
   } catch (e) {}
 }
 function clearPersistedSession() {
@@ -684,7 +700,7 @@ function clearPersistedSession() {
     const drop = [];
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k && (k.indexOf("msal.") === 0 || k.indexOf("eat.") === 0)) drop.push(k);
+      if (k && (k.indexOf("msal.") === 0 || k.indexOf("mat.") === 0)) drop.push(k);
     }
     drop.forEach(k => sessionStorage.removeItem(k));
   } catch (e) {}
@@ -696,9 +712,9 @@ async function restoreSession() {
   if (state.restoring || state.msalAccount) return;
   state.restoring = true;
   try {
-    const domain = sessionStorage.getItem("eat.domain") || "";
-    const upn = sessionStorage.getItem("eat.upn") || "";
-    if (!domain || !EAT_CFG.clientId) return;
+    const domain = sessionStorage.getItem("mat.domain") || "";
+    const upn = sessionStorage.getItem("mat.upn") || "";
+    if (!domain || !MAT_CFG.clientId) return;
     if (!(await loadMsal())) return;
     const app = await buildMsal(domain);
     const accounts = app.getAllAccounts() || [];
@@ -706,14 +722,14 @@ async function restoreSession() {
     if (!account) return;
     app.setActiveAccount(account);
     const tok = await app.acquireTokenSilent({
-      scopes: EAT_CFG.exoScopes || ["https://outlook.office365.com/.default"],
+      scopes: MAT_CFG.exoScopes || ["https://outlook.office365.com/.default"],
       account
     });
     state.msal = app; state.msalAccount = account;
     state.token = tok.accessToken;
     state.tokenExp = (tok.expiresOn ? tok.expiresOn.getTime() : Date.now() + 50 * 60 * 1000);
     state.upn = account.username || upn;
-    state.org = sessionStorage.getItem("eat.org") || domain;
+    state.org = sessionStorage.getItem("mat.org") || domain;
     if ($("upn") && !$("upn").value) $("upn").value = state.upn;
     if ($("org")) $("org").value = state.org;
     try { await ensureGraphToken(true); } catch (e) { log(t("tokenRefreshFailedLog", { err: "Graph: " + (e.message || e) })); }
@@ -726,7 +742,7 @@ $("connectBtn").onclick = async () => {
   const upn = $("upn").value.trim();
   const domain = upnDomain(upn);
   if (!upn || !domain) { $("homeStatus").textContent = t("enterUpn"); return; }
-  if (!EAT_CFG.clientId || EAT_CFG.clientId.indexOf("PASTE") === 0) {
+  if (!MAT_CFG.clientId || MAT_CFG.clientId.indexOf("PASTE") === 0) {
     $("homeStatus").textContent = t("serverNotConfigured");
     return;
   }
@@ -737,7 +753,7 @@ $("connectBtn").onclick = async () => {
   try {
     $("homeStatus").textContent = t("openingSignin");
     const app = await buildMsal(domain);
-    const scopes = EAT_CFG.exoScopes || ["https://outlook.office365.com/.default"];
+    const scopes = MAT_CFG.exoScopes || ["https://outlook.office365.com/.default"];
     const login = await app.loginPopup({ scopes, loginHint: upn });
     app.setActiveAccount(login.account);
     state.msal = app; state.msalAccount = login.account;
@@ -754,6 +770,13 @@ $("connectBtn").onclick = async () => {
       state.graphToken = ""; state.graphTokenExp = 0;
       await ensureGraphToken();
     } catch (e) { log(t("signinErrorLog", { err: "Graph token: " + (e.message || e) })); }
+    // Third token for the Power Platform sections (different resource).
+    // Silent-only here so Connect never pops a second consent window;
+    // Power Platform runs acquire interactively on demand instead.
+    try {
+      state.powerToken = ""; state.powerTokenExp = 0;
+      await ensurePowerToken(true);
+    } catch (e) { log(t("signinErrorLog", { err: "Power Platform token: " + (e.message || e) })); }
     setConnected(state.org + " (" + state.upn + ")");
     log(t("signedInLog", { upn: maskId(state.upn), org: maskHost(state.org) }));
   } catch (e) {
@@ -764,7 +787,7 @@ $("connectBtn").onclick = async () => {
 async function ensureToken() {
   if (state.msal && state.msalAccount && Date.now() > state.tokenExp - 5 * 60 * 1000) {
     const tok = await state.msal.acquireTokenSilent({
-      scopes: EAT_CFG.exoScopes || ["https://outlook.office365.com/.default"],
+      scopes: MAT_CFG.exoScopes || ["https://outlook.office365.com/.default"],
       account: state.msalAccount
     });
     state.token = tok.accessToken;
@@ -774,6 +797,8 @@ async function ensureToken() {
   // Graph refresh stays best-effort here: a missing/expired Graph token must
   // never block the Exchange sections. License runs re-acquire interactively.
   try { await ensureGraphToken(true); } catch (e) { log(t("tokenRefreshFailedLog", { err: "Graph: " + (e.message || e) })); }
+  // Same for the Power Platform token: best-effort, never blocking.
+  try { await ensurePowerToken(true); } catch (e) { log(t("tokenRefreshFailedLog", { err: "Power Platform: " + (e.message || e) })); }
 }
 async function ensureGraphToken(silentOnly) {
   // Graph license token: refresh when missing/expiring. Interactive popup only
@@ -781,7 +806,7 @@ async function ensureGraphToken(silentOnly) {
   // silent so Exchange polling never pops a window.
   if (!state.msal || !state.msalAccount) return;
   if (state.graphToken && Date.now() < state.graphTokenExp - 5 * 60 * 1000) return;
-  const scopes = EAT_CFG.graphScopes || ["User.Read.All", "Organization.Read.All", "Group.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "TeamMember.Read.All", "ChannelMember.Read.All", "TeamsAppInstallation.ReadForTeam", "TeamsTab.Read.All", "Reports.Read.All", "ChannelMessage.Read.All", "Sites.Read.All", "SharePointTenantSettings.Read.All", "AuditLog.Read.All", "UserAuthenticationMethod.Read.All", "RoleManagement.Read.Directory"];
+  const scopes = MAT_CFG.graphScopes || ["User.Read.All", "Organization.Read.All", "Group.Read.All", "Team.ReadBasic.All", "Channel.ReadBasic.All", "TeamMember.Read.All", "ChannelMember.Read.All", "TeamsAppInstallation.ReadForTeam", "TeamsTab.Read.All", "Reports.Read.All", "ChannelMessage.Read.All", "Sites.Read.All", "SharePointTenantSettings.Read.All", "AuditLog.Read.All", "UserAuthenticationMethod.Read.All", "RoleManagement.Read.Directory", "Directory.Read.All", "AdministrativeUnit.Read.All", "Policy.Read.All", "IdentityProvider.Read.All", "IdentityUserFlow.Read.All", "PrivilegedEligibilitySchedule.Read.AzureADGroup", "PrivilegedAssignmentSchedule.Read.AzureADGroup", "AccessReview.Read.All", "Application.Read.All", "Synchronization.Read.All", "Agreement.Read.All", "Device.Read.All", "TeamsTelephoneNumber.Read.All", "EntitlementManagement.Read.All", "CustomSecAttributeDefinition.Read.All", "CustomSecAttributeAssignment.Read.All", "Domain.Read.All", "IdentityRiskyUser.Read.All", "TermStore.Read.All", "Bookings.Read.All"];
   try {
     const tok = await state.msal.acquireTokenSilent({ scopes, account: state.msalAccount });
     state.graphToken = tok.accessToken;
@@ -791,6 +816,25 @@ async function ensureGraphToken(silentOnly) {
     const tok = await state.msal.loginPopup({ scopes });
     state.graphToken = tok.accessToken;
     state.graphTokenExp = (tok.expiresOn ? tok.expiresOn.getTime() : Date.now() + 50 * 60 * 1000);
+    try { state.msal.setActiveAccount(tok.account || state.msalAccount); } catch (e2) {}
+  }
+}
+async function ensurePowerToken(silentOnly) {
+  // Power Platform (BAP) token: refresh when missing/expiring. Interactive
+  // popup only during an explicit Connect (silentOnly falsy); background
+  // refreshes stay silent so other polling never pops a window.
+  if (!state.msal || !state.msalAccount) return;
+  if (state.powerToken && Date.now() < state.powerTokenExp - 5 * 60 * 1000) return;
+  const scopes = MAT_CFG.powerScopes || ["https://api.powerplatform.com/EnvironmentManagement.Environments.Read", "https://api.powerplatform.com/PowerAutomate.Flows.Read", "https://api.powerplatform.com/PowerApps.Apps.Read", "https://api.powerplatform.com/Connectivity.Connectors.Read"];
+  try {
+    const tok = await state.msal.acquireTokenSilent({ scopes, account: state.msalAccount });
+    state.powerToken = tok.accessToken;
+    state.powerTokenExp = (tok.expiresOn ? tok.expiresOn.getTime() : Date.now() + 50 * 60 * 1000);
+  } catch (e) {
+    if (silentOnly) throw e;
+    const tok = await state.msal.loginPopup({ scopes });
+    state.powerToken = tok.accessToken;
+    state.powerTokenExp = (tok.expiresOn ? tok.expiresOn.getTime() : Date.now() + 50 * 60 * 1000);
     try { state.msal.setActiveAccount(tok.account || state.msalAccount); } catch (e2) {}
   }
 }

@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     // "Teams" category (Microsoft Graph, NOT Exchange Online):
     //   teams-inventory            -> GET /groups?$filter=resourceProvisioningOptions/Any(x:x eq 'Team')
@@ -18,7 +18,10 @@ namespace ExchangeAuditTool
     // property names and the ';' CSV never clashes (multi-values are ','-joined).
     // Required Graph delegated scopes: Group.Read.All, Team.ReadBasic.All,
     // Channel.ReadBasic.All, TeamMember.Read.All, ChannelMember.Read.All
-    // (plus User.Read.All already used by Licensing).
+    // (plus User.Read.All already used by Licensing) and
+    // TeamsTelephoneNumber.Read.All for teams-phone-numbers (Graph beta -
+    // no v1.0 equivalent; calling policies and voice routing have NO Graph
+    // API at all, see the teams-voice/ companion scripts).
     internal static class SectionsTeams
     {
         public static void Register()
@@ -32,6 +35,7 @@ namespace ExchangeAuditTool
             AuditRegistry.Register(BuildSitesSection());
             AuditRegistry.Register(BuildActivitySection());
             AuditRegistry.Register(BuildComplianceSection());
+            AuditRegistry.Register(BuildPhoneNumbersSection());
         }
 
         private static List<string> Collect(AuditSelection sel, params string[] groupKeys)
@@ -42,7 +46,7 @@ namespace ExchangeAuditTool
         // Prefer header: membershipType is an evolvable enum - without it Graph
         // returns 'unknownFutureValue' instead of 'shared' for shared channels.
         private const string GraphHeaders =
-            "$headers = @{ Authorization = ('Bearer ' + $env:EAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual'; Prefer = 'include-unknown-enum-members' }";
+            "$headers = @{ Authorization = ('Bearer ' + $env:MAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual'; Prefer = 'include-unknown-enum-members' }";
 
         private const string FetchTeamsGroups =
             "$groups = @()\n" +
@@ -263,7 +267,7 @@ namespace ExchangeAuditTool
         {
             var section = new AuditSection(
                 "teams-channels",
-                "Channels",
+                "Channels (Standard)",
                 "Channels export",
                 "Audit channels per team via Graph: type, SharePoint folder plus owner/member/guest counts.",
                 "channel",
@@ -545,7 +549,7 @@ namespace ExchangeAuditTool
                 "teams-apps",
                 "Apps",
                 "Apps export",
-                "Audit apps installed in each team via Graph: one row per team x app with publisher and version.",
+                "Audit apps installed in each team via Graph: one row per team x app with app ID and version.",
                 "app",
                 AuditScope.Graph);
             section.Category = "Teams";
@@ -558,7 +562,6 @@ namespace ExchangeAuditTool
 
             var app = new AuditOptionGroup("app", "App", GroupMode.MultiCheck); app.Columns = 2;
             app.AddProp("AppName", true);
-            app.AddProp("Publisher", true);
             app.AddProp("AppId", true);
             app.AddProp("Version", true);
             app.AddProp("DistributionMethod", true);
@@ -574,10 +577,13 @@ namespace ExchangeAuditTool
             section.AddGroup(dist);
 
             // Publisher filter (never a CSV column, unchecked by default):
-            // hides everything published by Microsoft - including apps you may
-            // use deliberately (Planner, Approvals, Whiteboard...).
+            // Graph exposes NO publisher on teamsApp/teamsAppDefinition, so
+            // this matches a built-in list of well-known Microsoft
+            // first-party app IDs (seeded 2026-09) plus com.microsoft* tab
+            // IDs. Third-party store apps never match. New Microsoft apps
+            // may appear over time - uncheck to audit the raw list.
             var pubf = new AuditOptionGroup("publisher", "Publisher filter", GroupMode.MultiCheck); pubf.Columns = 1;
-            pubf.Hint = "Hides ALL Microsoft-published apps, deliberate or default. Leave unchecked to see everything.";
+            pubf.Hint = "Hides known Microsoft first-party apps (Activity, Planner, Whiteboard...). Third-party store apps are unaffected. Heuristic list, seeded 2026-09.";
             pubf.Add(new AuditOption("hidems", "Hide Microsoft-published apps", "hidems", false));
             section.AddGroup(pubf);
 
@@ -614,13 +620,15 @@ namespace ExchangeAuditTool
                 sb.AppendLine("    foreach ($a in $apps) {");
                 sb.AppendLine("        $an = ''; if ($a.teamsApp -and $a.teamsApp.displayName) { $an = [string]$a.teamsApp.displayName }");
                 sb.AppendLine("        $aid = ''; if ($a.teamsApp -and $a.teamsApp.id) { $aid = [string]$a.teamsApp.id }");
-                sb.AppendLine("        $pub = ''; if ($a.teamsAppDefinition -and $a.teamsAppDefinition.publisher -and $a.teamsAppDefinition.publisher.displayName) { $pub = [string]$a.teamsAppDefinition.publisher.displayName }");
                 sb.AppendLine("        $ver = ''; if ($a.teamsAppDefinition -and $a.teamsAppDefinition.version) { $ver = [string]$a.teamsAppDefinition.version }");
                 sb.AppendLine("        $dm = ''; if ($a.teamsApp -and $a.teamsApp.distributionMethod) { $dm = [string]$a.teamsApp.distributionMethod }");
                 sb.AppendLine("        if ($dm -ne '' -and $wantDist -notcontains $dm) { continue }");
                 if (hideMs)
-                    sb.AppendLine("        if ($pub -like 'Microsoft*') { continue }");
-                sb.AppendLine("        $rows.Add([pscustomobject]@{ TeamName = $tname; AppName = $an; Publisher = $pub; AppId = $aid; Version = $ver; DistributionMethod = $dm })");
+                {
+                    sb.AppendLine("        $msApps = @('14d6962d-6eeb-4f48-8890-de55454bb136','20c3440d-c67e-4420-9f80-0e50c39693df','2a84919f-59d8-4441-a975-2a8c2643b741','34b01851-c13d-4604-bb3b-5de1ecbf0288','5ae80e49-7ada-461a-a6bd-c5df2e0cdb06','86fcd49b-61a2-4701-b771-54728cd291fb','a2da8768-95d5-419e-9441-3b539865b118','a63f7012-8cc9-42d5-99c3-e35f526fab17','ef56c0de-36fc-4ef8-b417-3d82ba9d073c','00001016-de05-492e-9106-4828fc8a8687','040880f4-0c68-4c38-8821-d5efd2b6ddbe','0ae35b36-0fd7-422e-805b-d53af1579093','0d820ecd-def2-4297-adad-78056cde7c78','1c256a65-83a6-4b5c-9ccf-78f8afb6f1e8','1c4340de-2a85-40e5-8eb0-4f295368978b','26bc2873-6023-480c-a11b-76b66605ce8c','28db939f-b39d-4c81-8899-622f917cb1c6','29ae87cf-6545-4e79-8093-925d91e4150e','2a527703-1f6f-4559-a332-d8a7d288cd88','3bf2e254-d6c9-4e0c-b269-1c80c1220dc4','3e0a4fec-499b-4138-8e7c-71a9d88a62ed','3ed5b337-c2c9-4d5d-b7b4-84ff09a8fc1c','40517485-2262-4135-b174-401da4aa6f0f','41af5cfd-c249-424b-a3ea-5c4b115c3dc6','4a6520d6-94a8-4730-9184-24997b9b3401','5af6a76b-40fc-4ba1-af29-8f49b08e44fd','5db56dd0-534d-467b-aeda-d622bee2574a','7a0c1d53-f647-4d76-ab2c-fbc0d73c8bb0','7a78fde8-7c5c-445d-945e-9354649f9562','7d71c4a5-dd44-4525-b21b-867d7b2d6e94','81fef3a6-72aa-4648-a763-de824aeafb7d','8658fe70-540a-4930-b02b-65ae253193ff','8e14e873-35ba-4720-b787-0bed94370b17','95de633a-083e-42f5-b444-a4295d8e9314','9781bc7d-5b2e-4cd7-a179-46de9a6f0247','99e46335-5250-4a68-8499-3e4f55e6f3f6','aa39b2f8-3c8d-4ce1-8b8b-7fe02c59ae3e','b6e5270c-f367-4a4e-88b1-12946c11a616','b7fad6ce-2e23-4aba-b209-859a59ca230e','c1a1764c-6272-4d03-8495-7da9698ad40a','cae3a8a8-1ba9-4517-a708-4e0ab7fab7ee','d5305801-d9c4-4dd1-aadf-d3cdb0d9d893','d7958adf-f419-46fa-941b-1b946497ef84','d7958adf-f419-46fa-941b-1b946497ef95','d832a33f-28c2-4969-8ad0-4fee681dc5b4','d948be58-6ace-4f5a-a31c-0df7cf105a21','eb62d082-2c0a-4672-9252-e8e456f192b1')");
+                    sb.AppendLine("        if (($aid -like 'com.microsoft*') -or ($msApps -contains $aid)) { continue }");
+                }
+                sb.AppendLine("        $rows.Add([pscustomobject]@{ TeamName = $tname; AppName = $an; AppId = $aid; Version = $ver; DistributionMethod = $dm })");
                 sb.AppendLine("    }");
                 sb.AppendLine("}");
                 sb.AppendLine("$rows = $rows | Select-Object " + selectList);
@@ -971,6 +979,121 @@ namespace ExchangeAuditTool
                 sb.AppendLine("        Classification = $g.classification; ExpirationPolicy = $g.expirationDateTime");
                 sb.AppendLine("    })");
                 sb.AppendLine("}");
+                sb.AppendLine("$rows = $rows | Select-Object " + selectList);
+                sb.AppendLine();
+                sb.Append(ctx.ExportCsv("$rows"));
+                sb.AppendLine("Write-Host 'Export complete.'");
+                return sb.ToString();
+            };
+
+            return section;
+        }
+
+        // ============================================================ 10. PHONE NUMBERS (Graph beta)
+        // Teams Phone inventory: one row per Teams telephone number (type,
+        // activation/assignment state) plus assignee resolution (slow lookup).
+        // NOTE Graph beta only (no v1.0 equivalent): subject to change without
+        // notice. Needs TeamsTelephoneNumber.Read.All (+ User.Read.All, already
+        // required, to resolve assignee names). Calling policies
+        // (CsTeamsCallingPolicy) and voice routing (CsOnlineVoiceRoutingPolicy,
+        // routes, PSTN usages, Direct Routing SBCs) have NO Graph API at all -
+        // see the teams-voice/ companion scripts. Empty when Teams Phone is
+        // not in use (placeholder row keeps the CSV headers).
+        private static AuditSection BuildPhoneNumbersSection()
+        {
+            var section = new AuditSection(
+                "teams-phone-numbers",
+                "Phone numbers",
+                "Phone numbers export",
+                "Audit Teams telephone number assignments via Graph beta: number, type (Calling Plan / Operator Connect / Direct Routing), activation and assignment state plus assignee (slow lookup). Empty when Teams Phone is not in use.",
+                "phone",
+                AuditScope.Graph);
+            section.Category = "Teams";
+            section.Product = "Teams";
+            section.DefaultFileName = "TeamsPhoneNumbers.csv";
+            section.TipHtml = "Calling policies and voice routing (policies, routes, PSTN usages, SBCs) have no Graph API - use the companion Teams PowerShell inventory: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/teams-voice' target='_blank' rel='noopener'>teams-voice on GitHub</a>.";
+
+            var number = new AuditOptionGroup("number", "Number", GroupMode.MultiCheck); number.Columns = 2;
+            number.AddProp("TelephoneNumber", true);
+            number.AddProp("NumberType", true);
+            number.AddProp("NumberSource", true);
+            number.AddProp("IsoCountryCode", true);
+            number.AddProp("City", true);
+            section.AddGroup(number);
+
+            var state = new AuditOptionGroup("state", "Activation & assignment state", GroupMode.MultiCheck); state.Columns = 2;
+            state.AddProp("ActivationState", true);
+            state.AddProp("AssignmentStatus", true);
+            state.AddProp("AssignmentCategory", true);
+            state.AddProp("Capabilities", true);
+            section.AddGroup(state);
+
+            var assignee = new AuditOptionGroup("assignee", "Assignee (slow lookup)", GroupMode.MultiCheck); assignee.Columns = 1;
+            assignee.Hint = "assignmentTargetId resolved to a UPN via a cached per-target user lookup (needs User.Read.All, already required). Resource accounts are disabled users. A raw ID with type Policy/SharedCalling is a Teams shared-calling policy instance, not a user.";
+            assignee.Add(AuditOption.Prop("AssignedTo", true).MarkSlow());
+            assignee.Add(AuditOption.Prop("AssigneeType", true).MarkSlow());
+            assignee.Add(AuditOption.Prop("AssignmentTargetId", false).MarkSlow());
+            section.AddGroup(assignee);
+
+            PsScriptHelpers.AddSizeGroup(section);
+
+            section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
+            {
+                var chosen = Collect(sel, "number", "state", "assignee");
+                if (chosen.Count == 0) chosen.Add("TelephoneNumber");
+                string selectList = string.Join(", ", chosen.ToArray());
+                string size = sel.First("size", "Unlimited");
+                bool wantAssignee = chosen.Contains("AssignedTo") || chosen.Contains("AssigneeType") || chosen.Contains("AssignmentTargetId");
+
+                var sb = new StringBuilder();
+                sb.AppendLine("Write-Host 'Querying Teams telephone numbers (Graph beta)...'");
+                sb.AppendLine(GraphHeaders);
+                sb.AppendLine("$size = '" + size + "'\n$maxNumbers = -1\nif ($size -eq '100') { $maxNumbers = 100 } elseif ($size -eq '1000') { $maxNumbers = 1000 }");
+                sb.AppendLine("$nums = @()");
+                sb.AppendLine("$uri = 'https://graph.microsoft.com/beta/admin/teams/telephoneNumberManagement/numberAssignments'");
+                sb.AppendLine("while ($uri -and ($maxNumbers -lt 0 -or $nums.Count -lt $maxNumbers)) {");
+                sb.AppendLine("    $r = Invoke-RestMethod -Uri $uri -Headers $headers -Method Get -ErrorAction Stop");
+                sb.AppendLine("    $nums += @($r.value)");
+                sb.AppendLine("    $uri = $r.'@odata.nextLink'");
+                sb.AppendLine("}");
+                sb.AppendLine("if ($maxNumbers -ge 0 -and $nums.Count -gt $maxNumbers) { $nums = $nums[0..($maxNumbers - 1)] }");
+                sb.AppendLine("Write-Host (\"Retrieved {0} telephone number(s).\" -f $nums.Count)");
+                sb.AppendLine("if ($nums.Count -eq 0) { Write-Host 'No Teams telephone numbers found - Teams Phone not in use, or consent for TeamsTelephoneNumber.Read.All is missing.' }");
+                if (wantAssignee)
+                {
+                    sb.AppendLine("$tCache = @{}");
+                    sb.AppendLine("$script:tResFail = 0");
+                    sb.AppendLine("function Resolve-NumberTarget {");
+                    sb.AppendLine("    param($tid)");
+                    sb.AppendLine("    if (-not $tid) { return @{ Name = ''; Type = '' } }");
+                    sb.AppendLine("    if ($tCache.ContainsKey($tid)) { return $tCache[$tid] }");
+                    sb.AppendLine("    $nm = $tid; $tp = 'Policy/SharedCalling'");
+                    sb.AppendLine("    try {");
+                    sb.AppendLine("        $u = Invoke-RestMethod -Uri (\"https://graph.microsoft.com/v1.0/users/\" + $tid + \"?`$select=userPrincipalName,displayName,accountEnabled\") -Headers $headers -Method Get -ErrorAction Stop");
+                    sb.AppendLine("        $nm = [string]$u.userPrincipalName; if (-not $nm) { $nm = [string]$u.displayName }");
+                    sb.AppendLine("        $tp = 'User'; try { if (($null -ne $u.accountEnabled) -and (([bool]$u.accountEnabled) -eq $false)) { $tp = 'ResourceAccount' } } catch { }");
+                    sb.AppendLine("    } catch { $script:tResFail++ }");
+                    sb.AppendLine("    $tCache[$tid] = @{ Name = $nm; Type = $tp }");
+                    sb.AppendLine("    return $tCache[$tid]");
+                    sb.AppendLine("}");
+                }
+                sb.AppendLine("$rows = New-Object System.Collections.Generic.List[object]");
+                sb.AppendLine("foreach ($n in $nums) {");
+                sb.AppendLine("    $caps = ((@($n.capabilities) | ForEach-Object { [string]$_ } | Where-Object { $_ -ne '' } | Sort-Object -Unique) -join ',')");
+                if (wantAssignee)
+                {
+                    sb.AppendLine("    $at = ''; $aty = ''");
+                    sb.AppendLine("    $rt = Resolve-NumberTarget ([string]$n.assignmentTargetId); $at = [string]$rt.Name; $aty = [string]$rt.Type");
+                }
+                sb.AppendLine("    $rows.Add([pscustomobject]@{");
+                sb.AppendLine("        TelephoneNumber = $n.telephoneNumber; NumberType = $n.numberType; NumberSource = $n.numberSource;");
+                sb.AppendLine("        IsoCountryCode = $n.isoCountryCode; City = $n.city;");
+                sb.AppendLine("        ActivationState = $n.activationState; AssignmentStatus = $n.assignmentStatus; AssignmentCategory = $n.assignmentCategory; Capabilities = $caps;");
+                sb.AppendLine("        AssignedTo = " + (chosen.Contains("AssignedTo") ? "$at" : "''") + "; AssigneeType = " + (chosen.Contains("AssigneeType") ? "$aty" : "''") + "; AssignmentTargetId = " + (chosen.Contains("AssignmentTargetId") ? "[string]$n.assignmentTargetId" : "''"));
+                sb.AppendLine("    })");
+                sb.AppendLine("}");
+                sb.AppendLine("if ($rows.Count -eq 0) { $rows.Add([pscustomobject]@{ TelephoneNumber = ''; NumberType = ''; NumberSource = ''; IsoCountryCode = ''; City = ''; ActivationState = ''; AssignmentStatus = ''; AssignmentCategory = ''; Capabilities = ''; AssignedTo = ''; AssigneeType = ''; AssignmentTargetId = '' }) }");
+                if (wantAssignee) sb.AppendLine("if ($script:tResFail -gt 0) { Write-Host (\"WARNING: {0} assignee(s) could not be resolved to a user (shared-calling policy instances keep their raw ID by design; otherwise check User.Read.All).\" -f $script:tResFail) }");
                 sb.AppendLine("$rows = $rows | Select-Object " + selectList);
                 sb.AppendLine();
                 sb.Append(ctx.ExportCsv("$rows"));

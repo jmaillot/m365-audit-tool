@@ -62,3 +62,17 @@ Graph :
 #    ODBMembersCanShare, ODBAccessRequests,
 #    ShowPeoplePickerSuggestionsForGuestUsers, ...)
 ```
+
+## Hub sites (aucune API Graph)
+
+Ni propriété ni endpoint hub en Graph v1.0 : enregistrement des hubs et
+associations hub -> sites via SharePoint Online Management Shell. La
+navigation hub, l'héritage de thème et les permissions se reconstruisent
+dans le tenant cible — ce script dimensionne ce travail :
+
+```powershell
+.\Get-SPOHubInventory.ps1 -AdminUrl https://TENANT-admin.sharepoint.com -OutDir .\out
+# -> HubSites.csv (un hub par ligne : ID, URL, titre, description, logo),
+#    HubAssociations.csv (hub -> site + template, via un seul passage
+#    Get-SPOSite filtré localement sur HubSiteId)
+```

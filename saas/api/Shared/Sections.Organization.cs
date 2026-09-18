@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     // "Organization" category: sharing/federation/org-config singletons plus
     // email address policies. Every Get-* below exists on Exchange on-premises
@@ -108,6 +108,33 @@ namespace ExchangeAuditTool
             org.AddProp("PublicFolderShowClientControl", false);
             org.AddProp("OAuth2ClientProfileEnabled", false);
             section.AddGroup(org);
+
+            // Per-view defaults (the web resets checkboxes when the Object
+            // radio changes): each object checks its own property group
+            // (federation and federated-organization-ID share one group).
+            section.ViewDefaults["sharing"] = new List<string>
+            {
+                "sharing::Name", "sharing::Enabled", "sharing::Default", "sharing::Domains"
+            };
+            section.ViewDefaults["relationships"] = new List<string>
+            {
+                "relationships::Name", "relationships::Enabled", "relationships::DomainNames",
+                "relationships::FreeBusyAccessEnabled", "relationships::MailboxMoveEnabled"
+            };
+            section.ViewDefaults["federation"] = new List<string>
+            {
+                "federation::Name", "federation::ApplicationUri", "federation::TokenIssuerUri",
+                "federation::AccountNamespace"
+            };
+            section.ViewDefaults["fedorgid"] = new List<string>
+            {
+                "federation::Name", "federation::AccountNamespace", "federation::DelegationTrustLink"
+            };
+            section.ViewDefaults["orgconfig"] = new List<string>
+            {
+                "orgconfig::Name", "orgconfig::PublicFoldersEnabled", "orgconfig::ElcProcessingDisabled",
+                "orgconfig::OAuth2ClientProfileEnabled"
+            };
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -272,6 +299,18 @@ namespace ExchangeAuditTool
             tag.AddProp("RetentionAction", false);
             section.AddGroup(tag);
 
+            // Per-view defaults (the web resets checkboxes when the Object
+            // radio changes): each object checks its own property group.
+            section.ViewDefaults["policies"] = new List<string>
+            {
+                "policy::Name", "policy::RetentionPolicyTagLinks"
+            };
+            section.ViewDefaults["tags"] = new List<string>
+            {
+                "tag::Name", "tag::Type", "tag::RetentionEnabled",
+                "tag::AgeLimitForRetention", "tag::RetentionAction"
+            };
+
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
                 string which = sel.First("object", "policies");
@@ -332,6 +371,18 @@ namespace ExchangeAuditTool
             lists.AddProp("IncludedRecipients", false);
             lists.AddProp("LdapRecipientFilter", false);
             section.AddGroup(lists);
+
+            // Per-view defaults (the web resets checkboxes when the Object
+            // radio changes): each object checks its own property group.
+            section.ViewDefaults["oab"] = new List<string>
+            {
+                "oab::Name", "oab::IsDefault", "oab::AddressLists"
+            };
+            section.ViewDefaults["lists"] = new List<string>
+            {
+                "lists::Name", "lists::DisplayName", "lists::RecipientFilter",
+                "lists::IncludedRecipients"
+            };
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {
@@ -500,6 +551,18 @@ namespace ExchangeAuditTool
             assign.AddProp("RoleAssigneeType", false);
             assign.AddProp("Enabled", false);
             section.AddGroup(assign);
+
+            // Per-view defaults (the web resets checkboxes when the Object
+            // radio changes): each object checks its own property group.
+            section.ViewDefaults["policies"] = new List<string>
+            {
+                "policy::Name", "policy::IsDefault", "policy::AssignedRoles"
+            };
+            section.ViewDefaults["assignments"] = new List<string>
+            {
+                "assignments::Name", "assignments::Role", "assignments::RoleAssigneeName",
+                "assignments::RoleAssigneeType", "assignments::Enabled"
+            };
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {

@@ -1,20 +1,26 @@
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
-using ExchangeAuditTool;
+using M365AuditTool;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
 var app = builder.Build();
 app.UseCors();
 
-string dataDir = Environment.GetEnvironmentVariable("EAT_DATA_DIR") ?? "/data";
-string workerUrl = Environment.GetEnvironmentVariable("EAT_WORKER_URL") ?? "http://worker:8081";
+string dataDir = Environment.GetEnvironmentVariable("MAT_DATA_DIR") ?? "/data";
+string workerUrl = Environment.GetEnvironmentVariable("MAT_WORKER_URL") ?? "http://worker:8081";
 Directory.CreateDirectory(dataDir);
 
 AuditRegistry.BuildAll();
 // SaaS = Exchange Online only. OnPremises-only sections are hidden.
 var onlineSections = AuditRegistry.Sections.Where(s => s.Scope != AuditScope.OnPremises).ToList();
+// Startup scope log (diagnostics only, no secrets): a stale MAT_GRAPH_SCOPES
+// in the deployed .env silently overrides the built-in defaults, minting
+// tokens without newer scopes (403s confined to the newest sections that no
+// reconnect can fix). Compare with saas/.env.example when adding sections.
+Console.WriteLine("[eat] graph scopes: " + (Environment.GetEnvironmentVariable("MAT_GRAPH_SCOPES") ?? "(built-in defaults)"));
+Console.WriteLine("[eat] power scopes: " + (Environment.GetEnvironmentVariable("MAT_POWER_SCOPES") ?? "(built-in defaults)"));
 
 var jobs = new ConcurrentDictionary<string, JobRecord>();
 
@@ -31,18 +37,20 @@ app.MapGet("/api/health", () => Results.Json(new { ok = true, sections = onlineS
 // read from environment so the NAS admin only edits saas/.env.
 app.MapGet("/api/config", () =>
 {
-    string scopes = Environment.GetEnvironmentVariable("EAT_EXO_SCOPES") ?? "https://outlook.office365.com/.default";
-    string gscopes = Environment.GetEnvironmentVariable("EAT_GRAPH_SCOPES") ?? "User.Read.All Organization.Read.All Group.Read.All Team.ReadBasic.All Channel.ReadBasic.All TeamMember.Read.All ChannelMember.Read.All TeamsAppInstallation.ReadForTeam TeamsTab.Read.All Reports.Read.All ChannelMessage.Read.All Sites.Read.All SharePointTenantSettings.Read.All AuditLog.Read.All UserAuthenticationMethod.Read.All RoleManagement.Read.Directory";
+    string scopes = Environment.GetEnvironmentVariable("MAT_EXO_SCOPES") ?? "https://outlook.office365.com/.default";
+    string gscopes = Environment.GetEnvironmentVariable("MAT_GRAPH_SCOPES") ?? "User.Read.All Organization.Read.All Group.Read.All Team.ReadBasic.All Channel.ReadBasic.All TeamMember.Read.All ChannelMember.Read.All TeamsAppInstallation.ReadForTeam TeamsTab.Read.All Reports.Read.All ChannelMessage.Read.All Sites.Read.All SharePointTenantSettings.Read.All AuditLog.Read.All UserAuthenticationMethod.Read.All RoleManagement.Read.Directory Directory.Read.All AdministrativeUnit.Read.All Policy.Read.All IdentityProvider.Read.All IdentityUserFlow.Read.All PrivilegedEligibilitySchedule.Read.AzureADGroup PrivilegedAssignmentSchedule.Read.AzureADGroup AccessReview.Read.All Application.Read.All Synchronization.Read.All Agreement.Read.All Device.Read.All TeamsTelephoneNumber.Read.All EntitlementManagement.Read.All CustomSecAttributeDefinition.Read.All CustomSecAttributeAssignment.Read.All Domain.Read.All IdentityRiskyUser.Read.All TermStore.Read.All Bookings.Read.All";
+    string pscopes = Environment.GetEnvironmentVariable("MAT_POWER_SCOPES") ?? "https://api.powerplatform.com/EnvironmentManagement.Environments.Read https://api.powerplatform.com/PowerAutomate.Flows.Read https://api.powerplatform.com/PowerApps.Apps.Read https://api.powerplatform.com/Connectivity.Connectors.Read";
     var sources = new List<string>();
-    string envSrc = Environment.GetEnvironmentVariable("EAT_MSAL_SRC") ?? "";
+    string envSrc = Environment.GetEnvironmentVariable("MAT_MSAL_SRC") ?? "";
     if (!string.IsNullOrWhiteSpace(envSrc)) sources.Add(envSrc.Trim());
     sources.Add("./msal-browser.min.js"); // vendored copy next to index.html (see README)
     return Results.Json(new
     {
-        clientId = (Environment.GetEnvironmentVariable("EAT_CLIENT_ID") ?? "").Trim(),
+        clientId = (Environment.GetEnvironmentVariable("MAT_CLIENT_ID") ?? "").Trim(),
         msalSources = sources,
         exoScopes = scopes.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries),
-        graphScopes = gscopes.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+        graphScopes = gscopes.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries),
+        powerScopes = pscopes.Split(new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
     });
 });
 
@@ -98,15 +106,21 @@ app.MapPost("/api/jobs", async (HttpRequest req) =>
     // Bearer token = EXO delegated access token for https://outlook.office365.com.
     // Graph sections (AuditScope.Graph) additionally need the Microsoft Graph
     // delegated token via X-Graph-Token (never persisted, never logged).
-    // Both are forwarded to the worker in-memory only.
+    // Power Platform sections (AuditScope.PowerPlatform) additionally need the
+    // Power Platform (BAP) delegated token via X-Power-Token (same handling).
+    // All are forwarded to the worker in-memory only.
     string auth = req.Headers.Authorization.ToString();
     string token = auth.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) ? auth.Substring(7).Trim() : "";
     string graphToken = req.Headers.TryGetValue("X-Graph-Token", out var gtv) ? gtv.ToString().Trim() : "";
     if (graphToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) graphToken = graphToken.Substring(7).Trim();
+    string powerToken = req.Headers.TryGetValue("X-Power-Token", out var ptv) ? ptv.ToString().Trim() : "";
+    if (powerToken.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) powerToken = powerToken.Substring(7).Trim();
     string org = req.Headers.TryGetValue("X-Tenant-Id", out var tv) ? tv.ToString() : "";
     if (root.TryGetProperty("organization", out var orgProp)) org = orgProp.GetString() ?? org;
     bool isGraph = section.Scope == AuditScope.Graph;
+    bool isPower = section.Scope == AuditScope.PowerPlatform;
     if (isGraph && string.IsNullOrEmpty(graphToken)) return Results.Json(new { error = "Missing X-Graph-Token header (Microsoft Graph access token for this license audit)" }, statusCode: 401);
+    if (isPower && string.IsNullOrEmpty(powerToken)) return Results.Json(new { error = "Missing X-Power-Token header (Power Platform access token for this Power Platform audit)" }, statusCode: 401);
     if (!isGraph && string.IsNullOrEmpty(token)) return Results.Json(new { error = "Missing Authorization: Bearer <EXO access token>" }, statusCode: 401);
     if (string.IsNullOrEmpty(org)) return Results.Json(new { error = "Missing tenant organization (X-Tenant-Id header or organization field)" }, statusCode: 422);
 
@@ -174,7 +188,7 @@ app.MapPost("/api/jobs", async (HttpRequest req) =>
         try
         {
             job.Status = "running";
-            var payload = JsonSerializer.Serialize(new { jobId, organization = org, script = auditBody, includeXlsx, graphToken });
+            var payload = JsonSerializer.Serialize(new { jobId, organization = org, script = auditBody, includeXlsx, graphToken, powerToken });
             using var fwd = new HttpRequestMessage(HttpMethod.Post, baseUrl + "/run");
             fwd.Content = new StringContent(payload, Encoding.UTF8, "application/json");
             fwd.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
@@ -227,7 +241,7 @@ app.MapPost("/api/jobs", async (HttpRequest req) =>
             job.Status = "failed";
             job.Error = ex.Message;
         }
-        finally { token = ""; graphToken = ""; } // drop references ASAP
+        finally { token = ""; graphToken = ""; powerToken = ""; } // drop references ASAP
     });
 
     return Results.Json(new { jobId, status = job.Status });
@@ -381,7 +395,7 @@ static void TryConvertToXlsx(string csvPath)
     try
     {
         string xlsxPath = Path.ChangeExtension(csvPath, ".xlsx");
-        ExchangeAuditSaaS.Xlsx.FromCsv(csvPath, xlsxPath, "Audit");
+        M365AuditSaaS.Xlsx.FromCsv(csvPath, xlsxPath, "Audit");
     }
     catch { }
 }

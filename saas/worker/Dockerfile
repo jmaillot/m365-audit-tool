@@ -22,7 +22,7 @@ RUN echo "licensing CSV refresh token: $CSV_REFRESH_TOKEN" && \
     if [ -f licensing-names.csv ]; then COND="-z licensing-names.csv"; ls -l --time-style=long-iso licensing-names.csv; else COND=""; echo "no baked copy yet, full download"; fi && \
     curl -fSL --retry 2 --max-time 120 $COND "https://download.microsoft.com/download/e/3/e/e3e9faf2-f28b-490a-9ada-c6089a1fc5b0/Product%20names%20and%20service%20plan%20identifiers%20for%20licensing.csv" -o licensing-names.csv && \
     ls -la licensing-names.csv || echo "WARNING: licensing-names.csv not baked in; license audits fall back to live download / raw IDs"
-ENV EAT_DATA_DIR=/data EAT_CONNECT_TIMEOUT_SEC=300 EAT_AUDIT_TIMEOUT_SEC=1800 EAT_DEMO_MODE=false
+ENV MAT_DATA_DIR=/data MAT_CONNECT_TIMEOUT_SEC=300 MAT_AUDIT_TIMEOUT_SEC=1800 MAT_DEMO_MODE=false
 VOLUME /data
 EXPOSE 8081
 CMD ["python3", "run_job.py"]

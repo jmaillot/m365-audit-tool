@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
-    // "Protection" category: Exchange Online Protection policies and rules plus
+    // "Defender for O365" category: Exchange Online Protection policies and rules plus
     // DLP. There is no on-premises equivalent, so this is ExchangeOnline-only
     // (the runtime scope guard blocks it elsewhere with guidance).
     internal static class SectionsProtection
@@ -48,7 +48,7 @@ namespace ExchangeAuditTool
                 "Audit Exchange Online Protection, Safe Links/Attachments and DLP (policies + rules). One object per run.",
                 "shield",
                 AuditScope.ExchangeOnline);
-            section.Category = "Protection";
+            section.Category = "Defender for O365";
             section.DefaultFileName = "ProtectionPolicies.csv";
 
             var obj = new AuditOptionGroup("object", "Object", GroupMode.SingleChoice); obj.Columns = 1;
@@ -150,6 +150,67 @@ namespace ExchangeAuditTool
             ruleprops.AddProp("Priority", false);
             ruleprops.AddProp("Comments", false);
             section.AddGroup(ruleprops);
+
+            // Per-view defaults (the web resets checkboxes when the Object
+            // radio changes): each object checks its own property group.
+            // Rule views check the shared rule group; the linked policy
+            // column is added by the script automatically.
+            section.ViewDefaults["antispamin"] = new List<string>
+            {
+                "antispamin::Name", "antispamin::SpamAction", "antispamin::HighConfidenceSpamAction"
+            };
+            section.ViewDefaults["antispamout"] = new List<string>
+            {
+                "antispamout::Name", "antispamout::AutoForwardingMode"
+            };
+            section.ViewDefaults["antimalware"] = new List<string>
+            {
+                "antimalware::Name", "antimalware::Action", "antimalware::EnableFileFilter",
+                "antimalware::ZapEnabled"
+            };
+            section.ViewDefaults["antiphish"] = new List<string>
+            {
+                "antiphish::Name", "antiphish::Enabled", "antiphish::AuthenticationFailAction",
+                "antiphish::SpoofEnabled", "antiphish::HonorDmarcPolicy"
+            };
+            section.ViewDefaults["safelinks"] = new List<string>
+            {
+                "safelinks::Name", "safelinks::Enabled", "safelinks::TrackClicks",
+                "safelinks::ScanUrls", "safelinks::EnableForInternalSenders"
+            };
+            section.ViewDefaults["safeattachments"] = new List<string>
+            {
+                "safeattachments::Name", "safeattachments::Enable", "safeattachments::Action",
+                "safeattachments::ActionOnError"
+            };
+            section.ViewDefaults["dlp"] = new List<string>
+            {
+                "dlp::Name", "dlp::State", "dlp::Mode", "dlp::Priority"
+            };
+            section.ViewDefaults["ruleantispamin"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
+            section.ViewDefaults["ruleantispamout"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
+            section.ViewDefaults["ruleantimalware"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
+            section.ViewDefaults["ruleantiphish"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
+            section.ViewDefaults["rulesafelinks"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
+            section.ViewDefaults["rulesafeattachments"] = new List<string>
+            {
+                "ruleprops::Name", "ruleprops::State", "ruleprops::Priority"
+            };
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {

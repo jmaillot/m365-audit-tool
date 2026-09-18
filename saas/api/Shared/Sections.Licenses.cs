@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     // "Licenses" category (Microsoft Graph, NOT Exchange Online):
     //   licenses-overview -> GET /subscribedSkus (tenant SKUs: display names,
@@ -98,7 +98,7 @@ namespace ExchangeAuditTool
             "$lic = [string]$s.skuPartNumber; if ($LicenceNameOf.ContainsKey([string]$s.skuId)) { $lic = $LicenceNameOf[[string]$s.skuId] }";
 
         private const string GraphHeaders =
-            "$headers = @{ Authorization = ('Bearer ' + $env:EAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual' }";
+            "$headers = @{ Authorization = ('Bearer ' + $env:MAT_GRAPH_TOKEN); ConsistencyLevel = 'eventual' }";
 
         private const string FetchSkus =
             "$skus = @()\n" +

@@ -4,8 +4,8 @@ services:
     ports: ["8080:8080"]
     env_file: .env
     environment:
-      EAT_DATA_DIR: /data
-      EAT_WORKER_URL: http://worker:8081
+      MAT_DATA_DIR: /data
+      MAT_WORKER_URL: http://worker:8081
     volumes: [audit-data:/data]
     depends_on: [worker]
   worker:
@@ -14,10 +14,10 @@ services:
       args:
         CSV_REFRESH_TOKEN: ${CSV_REFRESH_TOKEN:-2026-01}
     environment:
-      EAT_DATA_DIR: /data
-      EAT_AUDIT_TIMEOUT_SEC: 1800
+      MAT_DATA_DIR: /data
+      MAT_AUDIT_TIMEOUT_SEC: 1800
       # true = fake CSVs without Exchange (UI testing). false = real EXO calls.
-      EAT_DEMO_MODE: ${EAT_DEMO_MODE:-false}
+      MAT_DEMO_MODE: ${MAT_DEMO_MODE:-false}
     volumes: [audit-data:/data]
   web:
     build: ./web

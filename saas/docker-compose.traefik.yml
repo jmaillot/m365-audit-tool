@@ -1,7 +1,7 @@
-# Production: Exchange Audit SaaS behind Traefik. STANDALONE file (does not
+# Production: M365 Audit SaaS behind Traefik. STANDALONE file (does not
 # extend docker-compose.yml) — run it directly:
 #
-#   cp .env.example .env   # set EAT_DEMO_MODE=false for real audits
+#   cp .env.example .env   # set MAT_DEMO_MODE=false for real audits
 #   # edit the Host() rule below, then:
 #   docker compose -f docker-compose.traefik.yml up --build -d
 #
@@ -17,7 +17,7 @@
 services:
   web:
     build: ./web
-    container_name: exchange-audit-web
+    container_name: m365-audit-web
     env_file: .env
     security_opt:
       - no-new-privileges:true
@@ -32,18 +32,18 @@ services:
     labels:
       - "traefik.enable=true" # Explicitly tell Traefik to expose this container
       ## Container routers
-      - "traefik.http.routers.exchange-audit-rtr.entrypoints=https" # listen on https
-      - "traefik.http.routers.exchange-audit-rtr.rule=Host(`audit.example.domain.fr`)" # https hostname
-      - "traefik.http.routers.exchange-audit-rtr.service=exchange-audit-svc"
+      - "traefik.http.routers.m365-audit-rtr.entrypoints=https" # listen on https
+      - "traefik.http.routers.m365-audit-rtr.rule=Host(`audit.example.domain.fr`)" # https hostname
+      - "traefik.http.routers.m365-audit-rtr.service=m365-audit-svc"
       ## Container Service
-      - "traefik.http.services.exchange-audit-svc.loadbalancer.server.port=80" # nginx listening port inside container
+      - "traefik.http.services.m365-audit-svc.loadbalancer.server.port=80" # nginx listening port inside container
       - "traefik.docker.network=macvlan_proxy"
       ## Container Middlewares
-      - "traefik.http.routers.exchange-audit-rtr.middlewares=chain-no-auth@file"
+      - "traefik.http.routers.m365-audit-rtr.middlewares=chain-no-auth@file"
 
   api:
     build: ./api
-    container_name: exchange-audit-api
+    container_name: m365-audit-api
     env_file: .env
     security_opt:
       - no-new-privileges:true
@@ -51,8 +51,8 @@ services:
       - PUID=1026
       - PGID=100
       - TZ=Europe/Paris
-      - EAT_DATA_DIR=/data
-      - EAT_WORKER_URL=http://worker:8081
+      - MAT_DATA_DIR=/data
+      - MAT_WORKER_URL=http://worker:8081
     tmpfs:
       - /data:size=2g,mode=1777 # ephemeral job storage, wiped with the container
     # Internal only, reachable by `web` as http://api:8080.
@@ -71,7 +71,7 @@ services:
       context: ./worker
       args:
         CSV_REFRESH_TOKEN: ${CSV_REFRESH_TOKEN:-2026-01}
-    container_name: exchange-audit-worker
+    container_name: m365-audit-worker
     env_file: .env
     security_opt:
       - no-new-privileges:true
@@ -79,8 +79,8 @@ services:
       - PUID=1026
       - PGID=100
       - TZ=Europe/Paris
-      - EAT_DATA_DIR=/data
-      - EAT_AUDIT_TIMEOUT_SEC=1800
+      - MAT_DATA_DIR=/data
+      - MAT_AUDIT_TIMEOUT_SEC=1800
     tmpfs:
       - /data:size=2g,mode=1777 # ephemeral job storage, wiped with the container
     restart: unless-stopped

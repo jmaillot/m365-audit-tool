@@ -1,19 +1,24 @@
 #!/usr/bin/env python3
-"""Exchange Audit worker: executes the API-generated audit script with pwsh.
+"""M365 Audit worker: executes the API-generated audit script with pwsh.
 
-POST /run {jobId, organization, script, includeXlsx, graphToken}
+POST /run {jobId, organization, script, includeXlsx, graphToken, powerToken}
   Authorization: Bearer <EXO delegated access token for https://outlook.office365.com>
-  graphToken: Microsoft Graph delegated token (license sections only,
+  graphToken: Microsoft Graph delegated token (Graph sections only,
     forwarded by the API from the X-Graph-Token header).
+  powerToken: Power Platform delegated token, audience
+    https://api.powerplatform.com (Power Platform sections only,
+    forwarded by the API from the X-Power-Token header).
   Writes /data/<jobId>.csv (+ .log). Tokens are kept in memory only, never logged.
 
 EXO scripts run under Connect-ExchangeOnline; Graph scripts (Invoke-RestMethod
-against graph.microsoft.com) run with $env:EAT_GRAPH_TOKEN and no EXO
-connection. Protection sections use Connect-IPPSSession.
+against graph.microsoft.com) run with $env:MAT_GRAPH_TOKEN and no EXO
+connection. Power Platform scripts (Invoke-RestMethod against
+api.powerplatform.com) run with $env:MAT_POWER_TOKEN and no EXO connection.
+Protection sections use Connect-IPPSSession.
 
 GET /health -> {ok, demoMode, exoModule}
 
-EAT_DEMO_MODE=true generates a fake CSV from the Select-Object column list so the
+MAT_DEMO_MODE=true generates a fake CSV from the Select-Object column list so the
 UI can be tested without a tenant. Protection sections use Connect-IPPSSession.
 """
 import csv
@@ -25,9 +30,9 @@ import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse, parse_qs
 
-DATA = os.environ.get("EAT_DATA_DIR", "/data")
-DEMO = os.environ.get("EAT_DEMO_MODE", "false").lower() == "true"
-AUDIT_TIMEOUT = int(os.environ.get("EAT_AUDIT_TIMEOUT_SEC", "1800"))
+DATA = os.environ.get("MAT_DATA_DIR", "/data")
+DEMO = os.environ.get("MAT_DEMO_MODE", "false").lower() == "true"
+AUDIT_TIMEOUT = int(os.environ.get("MAT_AUDIT_TIMEOUT_SEC", "1800"))
 os.makedirs(DATA, exist_ok=True)
 
 
@@ -69,29 +74,53 @@ def is_graph_script(script):
     return "graph.microsoft.com" in (script or "").lower()
 
 
-def run_real(job_id, org, script, token, graph_token=""):
+def is_power_script(script):
+    return "api.bap.microsoft.com" in (script or "").lower() or "api.powerplatform.com" in (script or "").lower()
+
+
+def run_real(job_id, org, script, token, graph_token="", power_token=""):
     log_path = os.path.join(DATA, job_id + ".log")
     csv_path = os.path.join(DATA, job_id + ".csv")
-    if is_graph_script(script):
+    if is_power_script(script):
+        if not power_token:
+            raise RuntimeError("power audit requires a Power Platform access token")
+        wrapper = (
+            "$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'\n"
+            + script
+        )
+        env = dict(os.environ, MAT_POWER_TOKEN=power_token, MAT_ORG=org)
+    elif is_graph_script(script):
         if not graph_token:
             raise RuntimeError("graph audit requires a Graph access token")
         wrapper = (
             "$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'\n"
             + script
         )
-        env = dict(os.environ, EAT_GRAPH_TOKEN=graph_token, EAT_ORG=org)
+        env = dict(os.environ, MAT_GRAPH_TOKEN=graph_token, MAT_ORG=org)
     else:
         is_protection = "Get-HostedContentFilterPolicy" in script or "Get-MalwareFilterPolicy" in script \
-            or "Get-AntiPhishPolicy" in script or "Get-SafeLinksPolicy" in script or "Get-DlpPolicy" in script
+            or "Get-AntiPhishPolicy" in script or "Get-SafeLinksPolicy" in script or "Get-DlpPolicy" in script \
+            or "Get-DlpComplianceRule" in script or "Get-LabelPolicy" in script or "Get-Label " in script \
+            or "Get-CaseHoldPolicy" in script or "Get-CaseHoldRule" in script or "Get-ComplianceCase" in script \
+            or "Get-ComplianceTag" in script or "Get-RetentionCompliancePolicy" in script or "Get-RetentionComplianceRule" in script \
+            or "Get-InformationBarrier" in script or "Get-SupervisoryReview" in script or "Get-InsiderRisk" in script
+        # eDiscovery cmdlets (Get-ComplianceCase family) are not imported into
+        # a default compliance session - Microsoft requires Connect-IPPSSession
+        # -EnableSearchOnlySession for them (EXO module 3.9.0+). Only the holds
+        # scripts set is_ediscovery, so DLP/labels sessions are unaffected.
+        is_ediscovery = "Get-ComplianceCase" in script or "-ComplianceSearch" in script
         connect = (
             "Import-Module ExchangeOnlineManagement -ErrorAction Stop\n"
             "$ProgressPreference='SilentlyContinue'; $ErrorActionPreference='Stop'\n"
-            "Connect-ExchangeOnline -AccessToken $env:EAT_TOKEN -Organization $env:EAT_ORG -ShowBanner:$false\n"
+            "Connect-ExchangeOnline -AccessToken $env:MAT_TOKEN -Organization $env:MAT_ORG -ShowBanner:$false\n"
         )
         if is_protection:
-            connect += "Connect-IPPSSession -AccessToken $env:EAT_TOKEN -Organization $env:EAT_ORG\n"
+            connect += "Connect-IPPSSession -AccessToken $env:MAT_TOKEN -Organization $env:MAT_ORG"
+            if is_ediscovery:
+                connect += " -EnableSearchOnlySession"
+            connect += "\n"
         wrapper = connect + "\n" + script + "\nDisconnect-ExchangeOnline -Confirm:$false\n"
-        env = dict(os.environ, EAT_TOKEN=token, EAT_ORG=org)
+        env = dict(os.environ, MAT_TOKEN=token, MAT_ORG=org)
     with tempfile.NamedTemporaryFile("w", suffix=".ps1", delete=False, encoding="utf-8") as tf:
         tf.write(wrapper)
         ps1 = tf.name
@@ -189,11 +218,16 @@ class Handler(BaseHTTPRequestHandler):
         org = str(payload.get("organization", ""))
         script = str(payload.get("script", ""))
         graph_token = str(payload.get("graphToken", ""))
+        power_token = str(payload.get("powerToken", ""))
         if not job_id or not script or not org:
             self._json(422, {"error": "jobId, organization and script are required"})
             return
         if not DEMO:
-            if is_graph_script(script):
+            if is_power_script(script):
+                if not power_token:
+                    self._json(401, {"error": "missing Power Platform access token"})
+                    return
+            elif is_graph_script(script):
                 if not graph_token:
                     self._json(401, {"error": "missing Graph access token"})
                     return
@@ -204,7 +238,7 @@ class Handler(BaseHTTPRequestHandler):
             if DEMO:
                 demo_csv(job_id, script)
             else:
-                run_real(job_id, org, script, token, graph_token)
+                run_real(job_id, org, script, token, graph_token, power_token)
             self._json(200, {"ok": True})
         except subprocess.TimeoutExpired:
             self._json(500, {"error": "audit timed out", "log": read_tail(job_id)})
@@ -213,6 +247,7 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             token = ""
             graph_token = ""
+            power_token = ""
 
 
 if __name__ == "__main__":

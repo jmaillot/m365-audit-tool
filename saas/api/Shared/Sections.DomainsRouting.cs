@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     // "Domains / Routing" category: Transport rules, Accepted domains, Remote domains, Connectors.
     // These are organization-level objects (no -ResultSize). Multi-valued props join with ','.
@@ -354,6 +354,24 @@ namespace ExchangeAuditTool
             opOut.AddProp("TlsCertificateName", false);
             opOut.AddProp("MaxMessageSize", false);
             section.AddGroup(opOut);
+
+            // Per-view defaults (the web resets checkboxes when the Direction
+            // radio changes): each direction checks its online + on-prem group.
+            section.ViewDefaults["inbound"] = new List<string>
+            {
+                "exoin::Name", "exoin::Enabled", "exoin::ConnectorType",
+                "exoin::SenderDomains", "exoin::SenderIPAddresses",
+                "opin::Name", "opin::Enabled", "opin::Server", "opin::Bindings",
+                "opin::RemoteIPRanges"
+            };
+            section.ViewDefaults["outbound"] = new List<string>
+            {
+                "exoout::Name", "exoout::Enabled", "exoout::ConnectorType",
+                "exoout::RecipientDomains", "exoout::SmartHosts",
+                "opout::Name", "opout::Enabled", "opout::AddressSpaces",
+                "opout::SmartHosts", "opout::DNSRoutingEnabled",
+                "opout::SourceTransportServers"
+            };
 
             section.BuildScript = delegate (AuditSelection sel, ScriptContext ctx)
             {

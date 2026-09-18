@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ExchangeAuditTool
+namespace M365AuditTool
 {
     internal static class SectionsPublicFolders
     {
@@ -23,7 +23,7 @@ namespace ExchangeAuditTool
         {
             var section = new AuditSection(
                 "pf-mailboxes",
-                "PF mailboxes",
+                "Public Folder Mailboxes",
                 "Public folder mailbox export",
                 "Audit public folder mailboxes (host the hierarchy and content).",
                 "folder",
@@ -155,7 +155,7 @@ namespace ExchangeAuditTool
         {
             var section = new AuditSection(
                 "pf-hierarchy",
-                "PF hierarchy",
+                "Public Folder Hierarchy",
                 "Public folder hierarchy export",
                 "Audit the public folder tree, statistics and client permissions.",
                 "folder",
@@ -202,6 +202,21 @@ namespace ExchangeAuditTool
             mode.Add(new AuditOption("folders", "Folder rows only", "folders", true));
             mode.Add(new AuditOption("expandperms", "Expand permissions (one row per folder + user)", "expandperms", false));
             section.AddGroup(mode);
+
+            // Per-view defaults (the web resets checkboxes when the Output
+            // mode radio changes): expanded rows need the permissions lookup
+            // checked, folder rows don't.
+            section.ViewDefaults["folders"] = new List<string>
+            {
+                "tree::Identity", "tree::Name", "tree::FolderClass",
+                "tree::MailEnabled", "tree::ContentMailboxName"
+            };
+            section.ViewDefaults["expandperms"] = new List<string>
+            {
+                "tree::Identity", "tree::Name", "tree::FolderClass",
+                "tree::MailEnabled", "tree::ContentMailboxName",
+                "perms::clientperms"
+            };
 
             PsScriptHelpers.AddSizeGroup(section);
 
@@ -327,7 +342,7 @@ namespace ExchangeAuditTool
         {
             var section = new AuditSection(
                 "mail-pf",
-                "Mail-enabled PF",
+                "Mail-Enabled Public Folders",
                 "Mail-enabled public folder export",
                 "Audit mail-enabled public folders (they have an SMTP address, like recipients).",
                 "folder",
