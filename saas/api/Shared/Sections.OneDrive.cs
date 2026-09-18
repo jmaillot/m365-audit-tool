@@ -43,7 +43,7 @@ namespace M365AuditTool
             section.Category = "OneDrive";
             section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "OneDriveSharing.csv";
-            section.TipHtml = "Link defaults, expirations and attestation need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Link defaults, expirations and attestation need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool/tree/main/scripts/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var odb = new AuditOptionGroup("odb", "OneDrive settings", GroupMode.MultiCheck); odb.Columns = 1;
             odb.Hint = "OneDrive-specific remainder of /admin/sharepoint/settings (needs SharePointTenantSettings.Read.All plus a SharePoint Administrator or Global Reader role). DeletedUserPersonalSiteRetentionDays = retention of departed users' OneDrives. Owner-invitation notifications and people-picker guest settings are SPO-cmdlet-only (see sp-migration).";

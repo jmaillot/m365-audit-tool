@@ -1011,7 +1011,7 @@ namespace M365AuditTool
             section.Category = "Teams";
             section.Product = "Teams";
             section.DefaultFileName = "TeamsPhoneNumbers.csv";
-            section.TipHtml = "Calling policies and voice routing (policies, routes, PSTN usages, SBCs) have no Graph API - use the companion Teams PowerShell inventory: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/teams-voice' target='_blank' rel='noopener'>teams-voice on GitHub</a>.";
+            section.TipHtml = "Calling policies and voice routing (policies, routes, PSTN usages, SBCs) have no Graph API - use the companion Teams PowerShell inventory: <a href='https://github.com/jmaillot/m365-audit-tool/tree/main/scripts/teams-voice' target='_blank' rel='noopener'>teams-voice on GitHub</a>.";
 
             var number = new AuditOptionGroup("number", "Number", GroupMode.MultiCheck); number.Columns = 2;
             number.AddProp("TelephoneNumber", true);

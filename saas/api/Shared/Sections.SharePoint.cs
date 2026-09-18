@@ -95,7 +95,7 @@ namespace M365AuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSites.csv";
-            section.TipHtml = "Non-group sites (communication/classic) need the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Non-group sites (communication/classic) need the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool/tree/main/scripts/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var site = new AuditOptionGroup("site", "Site columns", GroupMode.MultiCheck); site.Columns = 2;
             site.AddProp("SiteId", true);
@@ -274,7 +274,7 @@ namespace M365AuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSubsites.csv";
-            section.TipHtml = "Web-level config (template, language, unique permissions, navigation…) needs the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Web-level config (template, language, unique permissions, navigation…) needs the standalone admin scripts: <a href='https://github.com/jmaillot/m365-audit-tool/tree/main/scripts/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var sub = new AuditOptionGroup("subsite", "Subsite columns", GroupMode.MultiCheck); sub.Columns = 2;
             sub.AddProp("SiteId", true);
@@ -372,14 +372,14 @@ namespace M365AuditTool
             section.Category = "SharePoint";
             section.Product = "SharePoint/OneDrive";
             section.DefaultFileName = "SharePointSharing.csv";
-            section.TipHtml = "Remaining Get-SPOTenant settings (link defaults, expirations, attestation…) need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool-saas/tree/main/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
+            section.TipHtml = "Remaining Get-SPOTenant settings (link defaults, expirations, attestation…) need the standalone script: <a href='https://github.com/jmaillot/m365-audit-tool/tree/main/scripts/sp-migration' target='_blank' rel='noopener'>sp-migration on GitHub</a>.";
 
             var tenant = new AuditOptionGroup("tenant", "Tenant", GroupMode.MultiCheck); tenant.Columns = 1;
             tenant.AddProp("TenantName", true);
             section.AddGroup(tenant);
 
             var sharing = new AuditOptionGroup("sharing", "Sharing policy", GroupMode.MultiCheck); sharing.Columns = 2;
-            sharing.Hint = "Graph names differ slightly from Get-SPOTenant (RequireAcceptingAccountMatchInvitedAccount = isRequireAcceptingUserToMatchInvitedUserEnabled). Full detail (link defaults, expirations, attestation...): run sp-migration/scripts/Get-SPOTenantSharing.ps1 on an admin workstation.";
+            sharing.Hint = "Graph names differ slightly from Get-SPOTenant (RequireAcceptingAccountMatchInvitedAccount = isRequireAcceptingUserToMatchInvitedUserEnabled). Full detail (link defaults, expirations, attestation...): run scripts/sp-migration/scripts/Get-SPOTenantSharing.ps1 on an admin workstation.";
             sharing.AddProp("SharingCapability", true);
             sharing.AddProp("RequireAcceptingAccountMatchInvitedAccount", true);
             sharing.AddProp("SharingDomainRestrictionMode", true);
