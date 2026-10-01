@@ -6,6 +6,7 @@ const state = { sections: [], current: null, activeProduct: "", checks: {}, smar
 const I18N = {
 en: {
   searchSections: "Search audit sections", menuAria: "Menu", accountAria: "Account", navAria: "Navigation",
+  themeToDark: "Switch to dark", themeToLight: "Switch to light",
   navConnection: "Connection", navMonitor: "Monitor", navActivity: "Activity log",
   groupSys: "Connection & Monitor",
   crumbConnectionHome: "Connection &gt; M365 Audit",
@@ -51,6 +52,7 @@ en: {
 },
 fr: {
   searchSections: "Rechercher des sections", menuAria: "Menu", accountAria: "Compte", navAria: "Navigation",
+  themeToDark: "Passer en sombre", themeToLight: "Passer en clair",
   navConnection: "Connexion", navMonitor: "Supervision", navActivity: "Journal d'activité",
   groupSys: "Connexion & Monitor",
   crumbConnectionHome: "Connexion &gt; M365 Audit",
@@ -131,6 +133,21 @@ function refreshConnText() {
   $("connDot").title = label;
   $("connDot").classList.toggle("on", !!state.connLabel);
 }
+const FLAG_FR = '<svg width="22" height="15" viewBox="0 0 30 20" style="display:block" role="img" aria-hidden="true"><clipPath id="flagclip-fr"><rect width="30" height="20" rx="2"/></clipPath><g clip-path="url(#flagclip-fr)"><rect width="10" height="20" fill="#0055A4"/><rect x="10" width="10" height="20" fill="#fff"/><rect x="20" width="10" height="20" fill="#EF4135"/></g></svg>';
+const FLAG_US = '<svg width="22" height="15" viewBox="0 0 60 40" style="display:block" role="img" aria-hidden="true"><clipPath id="flagclip-us"><rect width="60" height="40" rx="4"/></clipPath><g clip-path="url(#flagclip-us)"><rect width="60" height="40" fill="#fff"/><rect y="0.000" width="60" height="3.077" fill="#B22234"/><rect y="6.154" width="60" height="3.077" fill="#B22234"/><rect y="12.308" width="60" height="3.077" fill="#B22234"/><rect y="18.462" width="60" height="3.077" fill="#B22234"/><rect y="24.615" width="60" height="3.077" fill="#B22234"/><rect y="30.769" width="60" height="3.077" fill="#B22234"/><rect y="36.923" width="60" height="3.077" fill="#B22234"/><rect width="30" height="21.538" fill="#3C3B6E"/><g fill="#fff"><circle cx="3.75" cy="2.15" r="1.1"/><circle cx="11.25" cy="2.15" r="1.1"/><circle cx="18.75" cy="2.15" r="1.1"/><circle cx="26.25" cy="2.15" r="1.1"/><circle cx="3.75" cy="6.45" r="1.1"/><circle cx="11.25" cy="6.45" r="1.1"/><circle cx="18.75" cy="6.45" r="1.1"/><circle cx="26.25" cy="6.45" r="1.1"/><circle cx="3.75" cy="10.75" r="1.1"/><circle cx="11.25" cy="10.75" r="1.1"/><circle cx="18.75" cy="10.75" r="1.1"/><circle cx="26.25" cy="10.75" r="1.1"/><circle cx="3.75" cy="15.05" r="1.1"/><circle cx="11.25" cy="15.05" r="1.1"/><circle cx="18.75" cy="15.05" r="1.1"/><circle cx="26.25" cy="15.05" r="1.1"/><circle cx="3.75" cy="19.35" r="1.1"/><circle cx="11.25" cy="19.35" r="1.1"/><circle cx="18.75" cy="19.35" r="1.1"/><circle cx="26.25" cy="19.35" r="1.1"/></g></g></svg>';
+
+const THEME_KEY = "mat.theme";
+let currentTheme = "light";
+function systemDark() { try { return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme:dark)").matches); } catch (e) { return false; } }
+function resolveTheme() { try { const s = localStorage.getItem(THEME_KEY); if (s === "dark" || s === "light") return s; } catch (e) {} return systemDark() ? "dark" : "light"; }
+function applyTheme(mode) {
+  currentTheme = mode === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", currentTheme);
+  const b = $("themeBtn"); if (!b) return;
+  b.textContent = currentTheme === "dark" ? "\u263C" : "\u263D";
+  const label = currentTheme === "dark" ? t("themeToLight") : t("themeToDark");
+  b.title = label; b.setAttribute("aria-label", label);
+}
 function applyI18n() {
   document.documentElement.lang = lang;
   document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
@@ -138,10 +155,11 @@ function applyI18n() {
   document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
   document.querySelectorAll("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml); });
   const lb = $("langBtn");
-  if (lb) { lb.textContent = lang.toUpperCase(); lb.title = lang === "fr" ? "Switch to English" : "Passer en français"; }
+  if (lb) { lb.innerHTML = lang === "fr" ? FLAG_FR : FLAG_US; lb.title = lang === "fr" ? "Switch to English" : "Passer en français"; lb.setAttribute("aria-label", lb.title); }
   refreshConnText();
   refreshResultInfoLang();
   updateRegisterLink();
+  applyTheme(currentTheme);
 }
 function refreshResultInfoLang() {
   // The results-preview line is set imperatively (status notes, empty text),
@@ -628,6 +646,11 @@ $("cancelBtn").onclick = async () => {
 $("crumbHome").onclick = e => { e.preventDefault(); showView("home"); };
 $("hamburger").onclick = () => $("sidenav").classList.toggle("hidden");
 $("langBtn").onclick = () => setLang(lang === "fr" ? "en" : "fr");
+$("themeBtn").onclick = () => {
+  const next = currentTheme === "dark" ? "light" : "dark";
+  try { localStorage.setItem(THEME_KEY, next); } catch (e) {}
+  applyTheme(next);
+};
 function setConnected(label) {
   state.connLabel = label;
   $("homeStatus").textContent = t("statusConnected");
@@ -871,6 +894,7 @@ $("topSearch").onkeydown = e => {
   }
 };
 
+currentTheme = resolveTheme();
 applyI18n();
 loadSections().then(restoreSession).then(restoreJob).catch(e => { log(t("apiDownLog", { err: e.message })); $("coverage").textContent = t("apiDownCoverage"); });
 updateRegisterLink();

@@ -4,18 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>M365 Audit Tool</title>
-<link rel="stylesheet" href="portal.css?v=3">
+<link rel="stylesheet" href="portal.css?v=9">
 </head>
 <body>
 <header class="topbar">
-  <button class="icon-btn" id="hamburger" data-i18n-aria="menuAria" aria-label="Menu">&#9776;</button>
+  <button class="icon-btn" id="hamburger" data-i18n-aria="menuAria" aria-label="Menu" title="Collapse navigation"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
   <span class="brand">M365 Audit Tool</span>
   <div class="topsearch"><input id="topSearch" type="search" data-i18n-ph="searchSections" placeholder="Search audit sections" aria-label="Search audit sections"></div>
   <div class="topright">
-    <button class="icon-btn" id="langBtn" title="Changer de langue">EN</button>
+    <button class="icon-btn" id="themeBtn" aria-label="Theme" title="Switch to dark"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2a6 6 0 1 0 0 12A7 7 0 0 1 8 2z" fill="currentColor"/></svg></button>
+    <button class="icon-btn" id="langBtn" title="Changer de langue"><svg width="22" height="15" viewBox="0 0 60 40" style="display:block" role="img" aria-hidden="true"><clipPath id="flagclip-us"><rect width="60" height="40" rx="4"/></clipPath><g clip-path="url(#flagclip-us)"><rect width="60" height="40" fill="#fff"/><rect y="0.000" width="60" height="3.077" fill="#B22234"/><rect y="6.154" width="60" height="3.077" fill="#B22234"/><rect y="12.308" width="60" height="3.077" fill="#B22234"/><rect y="18.462" width="60" height="3.077" fill="#B22234"/><rect y="24.615" width="60" height="3.077" fill="#B22234"/><rect y="30.769" width="60" height="3.077" fill="#B22234"/><rect y="36.923" width="60" height="3.077" fill="#B22234"/><rect width="30" height="21.538" fill="#3C3B6E"/><g fill="#fff"><circle cx="3.75" cy="2.15" r="1.1"/><circle cx="11.25" cy="2.15" r="1.1"/><circle cx="18.75" cy="2.15" r="1.1"/><circle cx="26.25" cy="2.15" r="1.1"/><circle cx="3.75" cy="6.45" r="1.1"/><circle cx="11.25" cy="6.45" r="1.1"/><circle cx="18.75" cy="6.45" r="1.1"/><circle cx="26.25" cy="6.45" r="1.1"/><circle cx="3.75" cy="10.75" r="1.1"/><circle cx="11.25" cy="10.75" r="1.1"/><circle cx="18.75" cy="10.75" r="1.1"/><circle cx="26.25" cy="10.75" r="1.1"/><circle cx="3.75" cy="15.05" r="1.1"/><circle cx="11.25" cy="15.05" r="1.1"/><circle cx="18.75" cy="15.05" r="1.1"/><circle cx="26.25" cy="15.05" r="1.1"/><circle cx="3.75" cy="19.35" r="1.1"/><circle cx="11.25" cy="19.35" r="1.1"/><circle cx="18.75" cy="19.35" r="1.1"/><circle cx="26.25" cy="19.35" r="1.1"/></g></g></svg></button>
     <span id="connDot" class="dot" title="Not connected"></span>
     <span id="connText">Not connected</span>
-    <button class="icon-btn" data-i18n-aria="accountAria" aria-label="Account">&#9679;</button>
+    <button class="icon-btn" data-i18n-aria="accountAria" aria-label="Account"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button>
   </div>
 </header>
 <div class="shell">
@@ -28,7 +29,7 @@
       <div class="breadcrumb" data-i18n-html="crumbConnectionHome">Connection &gt; M365 Audit</div>
       <h1>M365 Audit</h1>
       <div class="notice" data-i18n-html="noticeHtml"><strong>First time here?</strong> Enter your work email below, then click <a id="registerLink" href="#" target="_blank" rel="noopener">Register this tenant</a> (admin, once per tenant) before connecting.</div>
-      <div class="card">
+      <div class="card card--primary">
         <h2 data-i18n="connectTitle">Connect with Microsoft</h2>
         <p class="muted" data-i18n="connectDesc">Enter your work email (UPN) and sign in at Microsoft with an Exchange reader account (e.g. View-Only Organization Management). Tokens live in this tab only and are dropped on disconnect or tab close.</p>
         <label><span data-i18n="labelUpn">Work email (UPN)</span>
@@ -43,7 +44,7 @@
           <span id="homeStatus" class="muted"></span>
         </div>
       </div>
-      <div class="card">
+      <div class="card card--muted">
         <h2 id="coverageTitle">Coverage</h2>
         <div id="coverage" class="coverage"></div>
       </div>
@@ -55,12 +56,17 @@
       <div id="secTip" class="notice hidden"></div>
       <div class="toolbar">
         <span id="slowBadge" class="badge warn hidden" data-i18n="slowBadge">Slow options selected - this run may take longer</span>
-        <span class="spacer"></span>
-        <input id="filter" type="search" data-i18n-ph="filterOptions" placeholder="Filter options" aria-label="Filter options">
-        <button id="deselectSlow" class="btn hidden">Deselect slow</button>
-        <button id="selectAll" class="btn">Select all</button>
-        <button id="dlCsv" class="btn" disabled data-i18n="dlCsv">Download CSV</button>
-        <button id="dlXlsx" class="btn" disabled data-i18n="dlXlsx">Download XLSX</button>
+        <div class="toolbar-group">
+          <input id="filter" type="search" data-i18n-ph="filterOptions" placeholder="Filter options" aria-label="Filter options">
+        </div>
+        <div class="toolbar-actions">
+          <button id="deselectSlow" class="btn hidden">Deselect slow</button>
+          <button id="selectAll" class="btn">Select all</button>
+          <button id="densityBtn" class="btn" aria-pressed="false" title="Toggle compact density">Compact</button>
+          <button id="wrapBtn" class="btn" aria-pressed="false" title="Toggle text wrapping">Wrap</button>
+          <button id="dlCsv" class="btn" disabled data-i18n="dlCsv">Download CSV</button>
+          <button id="dlXlsx" class="btn" disabled data-i18n="dlXlsx">Download XLSX</button>
+        </div>
       </div>
       <div class="columns">
         <div class="left">
@@ -71,12 +77,13 @@
           </div>
         </div>
         <div class="right">
-          <div class="card">
+          <div class="card card--primary">
             <div class="row">
               <h2 data-i18n="resultsPreview">Results preview</h2>
             </div>
             <div id="resultInfo" class="muted">No results yet.</div>
-            <div class="grid-wrap"><table id="grid" data-i18n-aria="resultsTable" aria-label="Results"></table></div>
+            <div id="resultSkeleton" class="skeleton hidden" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="grid-wrap" id="gridWrap"><table id="grid" data-i18n-aria="resultsTable" aria-label="Results"></table></div>
             <pre id="jobLog" class="log hidden"></pre>
           </div>
         </div>
@@ -90,6 +97,6 @@
   </main>
 </div>
 <script src="config.js?v=2"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
